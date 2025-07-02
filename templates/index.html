@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <header>
+        <div class="container">
+            <div class="header-inner">
+                <div class="logo_outer">
+                     <img src="static/images/logo.png" class="logo" alt="">
+                </div>
+               
+                <a href="/logout" class="logout">Logout</a>
+            </div>
+        </div>
+    </header>
+    <main>
+        <div class="container">
+            <div class="main-top">
+                <section class="prediction-box">
+                    <h2>Today's Prediction</h2>
+                    <div class="match-info">
+                        <div class="team">
+                            <img src="static/images/arsenal_FC.svg" alt="arsenal" />
+                            <p>Arsenal</p>
+                        </div>
+                        <div class="vs">VS</div>
+                        <div class="team">
+                            <img src="static/images/chelsea_FC.svg" alt="chelsea" />
+                            <p>Chelsea</p>
+                        </div>
+                    </div>
+                    <div class="prediction">Prediction: <span>ARSENAL TO WIN</span></div>
+                    <div class="time">20:00</div>
+                </section>
+
+                <section class="performance-box">
+                    <h2>Performance</h2>
+                  
+                </section>
+            </div>
+
+            <section class="recent">
+                <h2>Recent Predictions</h2>
+                <div class="table_outer">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Match</th>
+                            <th>Match</th>
+                            <th>Prediction</th>
+                            <th>Result</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Villarreal</td>
+                            <td>Barcelona</td>
+                            <td>BARCELONA TO WIN</td>
+                            <td class="won">WON</td>
+                            <td>23 Apr 2024</td>
+                        </tr>
+                        <tr>
+                            <td>Real Madrid</td>
+                            <td>Sevilla</td>
+                            <td>REAL MADRID TO WIN</td>
+                            <td class="won">WON</td>
+                            <td>22 Apr 2024</td>
+                        </tr>
+                        <tr>
+                            <td>Everton</td>
+                            <td>Liverpool</td>
+                            <td>LIVERPOOL TO WIN</td>
+                            <td class="lost">LOST</td>
+                            <td>21 Apr 2024</td>
+                        </tr>
+                        <tr>
+                            <td>Napoli</td>
+                            <td>Milan</td>
+                            <td>NAPOLI TO WIN</td>
+                            <td class="won">WON</td>
+                            <td>20 Apr 2024</td>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="static/js/custom.js"></script>
+</body>
+
+</html>

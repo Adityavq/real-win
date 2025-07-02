@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Select Today Match</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .match-list { display: flex; flex-wrap: wrap; gap: 2rem; justify-content: center; margin-top: 2rem; }
+        .match-card { border: 1px solid #ddd; border-radius: 10px; padding: 1rem 2rem; background: #fff; box-shadow: 0 2px 8px #eee; display: flex; align-items: center; cursor: pointer; transition: box-shadow 0.2s; }
+        .match-card:hover { box-shadow: 0 4px 16px #ccc; }
+        .team-logo { width: 48px; height: 48px; object-fit: contain; margin: 0 1rem; }
+        .vs { font-weight: bold; font-size: 1.2rem; color: #333; }
+        .match-time { font-size: 0.95rem; color: #666; margin-left: 1rem; }
+    </style>
+</head>
+<body>
+    <h2 style="text-align:center; margin-top:2rem;">Select a Match to View Predictions</h2>
+    <div id="top5-predictions" style="max-width:800px;margin:2rem auto;"></div>
+    <div id="match-list" class="match-list"></div>
+    <button id="show-all-predictions" style="display:block;margin:2rem auto;">Show All Predictions</button>
+    <div id="all-predictions" style="max-width:900px;margin:2rem auto;"></div>
+    <script>
+        async function fetchTop5Predictions() {
+            const res = await fetch('/api/top5-today-predictions');
+            const data = await res.json();
+            const container = document.getElementById('top5-predictions');
+            if (data.status !== 'success' || !data.top5_predictions || !data.top5_predictions.length) {
+                container.innerHTML = '<p>No top 5 predictions available.</p>';
+                return;
+            }
+            let html = '<h3>Top 5 Predictions (by Confidence)</h3>';
+            html += '<ol>';
+            for (const pred of data.top5_predictions) {
+                html += `<li><b>Winner:</b> ${pred["Winner Team Name"] || pred["winner"] || '-'} | <b>Prediction:</b> ${pred["Prediction"] || pred["prediction"] || '-'} | <b>Confidence:</b> ${pred["Confidence"] || pred["confidence"] || '-'} | <b>Probability:</b> ${pred["A win probability estimate (in %)"] || pred["win_probability"] || '-'} </li>`;
+            }
+            html += '</ol>';
+            container.innerHTML = html;
+        }
+        async function fetchAllPredictions() {
+            const btn = document.getElementById('show-all-predictions');
+            btn.disabled = true;
+            btn.textContent = 'Loading...';
+            const res = await fetch('/api/all-today-predictions');
+            const data = await res.json();
+            const container = document.getElementById('all-predictions');
+            if (data.status !== 'success' || !data.predictions || !data.predictions.length) {
+                container.innerHTML = '<p>No predictions available.</p>';
+                btn.disabled = false;
+                btn.textContent = 'Show All Predictions';
+                return;
+            }
+            let html = '<h3>All Predictions for Today</h3>';
+            html += '<ol>';
+            for (const pred of data.predictions) {
+                html += `<li><b>Winner:</b> ${pred["Winner Team Name"] || pred["winner"] || '-'} | <b>Prediction:</b> ${pred["Prediction"] || pred["prediction"] || '-'} | <b>Confidence:</b> ${pred["Confidence"] || pred["confidence"] || '-'} | <b>Probability:</b> ${pred["A win probability estimate (in %)"] || pred["win_probability"] || '-'} | <b>Fixture ID:</b> ${pred["fixture_id"]}</li>`;
+            }
+            html += '</ol>';
+            container.innerHTML = html;
+            btn.disabled = false;
+            btn.textContent = 'Show All Predictions';
+        }
+        document.getElementById('show-all-predictions').onclick = fetchAllPredictions;
+        async function fetchFixtureDetails(fixture_id) {
+            const res = await fetch(`/api/fixture-details/${fixture_id}`);
+            return await res.json();
+        }
+
+        async function fetchMatches() {
+            const res = await fetch('/api/today-matches-list');
+            const matches = await res.json();
+            const list = document.getElementById('match-list');
+            if (!matches.length) {
+                list.innerHTML = '<p>No matches found for today.</p>';
+                return;
+            }
+            for (const match of matches) {
+                const details = await fetchFixtureDetails(match.fixture_id);
+                if (details.error) continue;
+                const card = document.createElement('div');
+                card.className = 'match-card';
+                card.innerHTML = `
+                    <img src="${details.home_logo}" class="team-logo" alt="${details.home_team}">
+                    <span>${details.home_team}</span>
+                    <span class="vs">vs</span>
+                    <span>${details.away_team}</span>
+                    <img src="${details.away_logo}" class="team-logo" alt="${details.away_team}">
+                    <span class="match-time">${details.starting_at.replace('T', ' ').slice(0, 16)}</span>
+                `;
+                card.onclick = async () => {
+                    const resp = await fetch('/api/select-match', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fixture_id: match.fixture_id })
+                    });
+                    const data = await resp.json();
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    }
+                };
+                list.appendChild(card);
+            }
+        }
+        fetchMatches();
+        fetchTop5Predictions();
+    </script>
+</body>
+</html> 
