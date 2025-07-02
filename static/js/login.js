@@ -16,7 +16,11 @@ document.querySelector("form").addEventListener("submit", async function (e) {
         const result = await response.json();
 
         if (response.ok) {
-            window.location.href = "/home"; 
+            if (result.redirect) {
+                window.location.href = result.redirect;
+            } else {
+                window.location.href = "/home"; // fallback
+            }
         } else {
             alert(result.error || "Login failed");
         }
