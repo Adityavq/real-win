@@ -227,7 +227,25 @@ Structured data:
     print("===== GPT PREDICTION RESULT =====")
     print(gpt_response)
     print("=================================")
-    return gpt_response
+    # Post-process to ensure all required fields are present
+    import json, re
+    try:
+        match = re.search(r'\{.*\}', gpt_response, re.DOTALL)
+        if match:
+            prediction_json = json.loads(match.group(0))
+        else:
+            prediction_json = {}
+    except Exception as e:
+        print(f"Failed to parse GPT prediction: {e}")
+        prediction_json = {}
+    # Ensure all required fields
+    required_fields = [
+        "fixture", "predicted_winner", "win_probability", "confidence_level", "explanation", "kickoff_time"
+    ]
+    for field in required_fields:
+        if field not in prediction_json or prediction_json[field] in [None, ""]:
+            prediction_json[field] = "-"
+    return json.dumps(prediction_json)
 
 
 def get_participant_team_ids(fixture_id):

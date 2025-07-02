@@ -3,38 +3,190 @@
 <head>
     <meta charset="UTF-8">
     <title>Select Today Match</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
+        body {
+            background: #10121a;
+            color: #fff;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+
+        .logo {
+            width: 80px;
+            margin: 30px auto 10px;
+            display: block;
+        }
+
+        .select-container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 30px 0;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.2rem;
+            margin-bottom: 30px;
+        }
+
+        .matches-list {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            margin-top: 20px;
+        }
+
+        .match-list-item {
+            background: #181b26;
+            border-radius: 16px;
+            padding: 18px 24px;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            box-shadow: 0 2px 12px #000a;
+            transition: box-shadow 0.2s, background 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .match-list-item:hover {
+            box-shadow: 0 4px 24px #e6ff00aa;
+            background: #23263a;
+            border-color: #e6ff00;
+        }
+
+        .teams {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-size: 1.15rem;
+            font-weight: 500;
+        }
+
+        .team-logo {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+            border-radius: 50%;
+            background: #222;
+            border: 1.5px solid #e6ff00;
+            margin: 0 4px;
+        }
+
+        .team-name {
+            color: #fff;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .vs {
+            color: #c6ff00;
+            font-weight: bold;
+            font-size: 1.3em;
+            margin: 0 12px;
+            text-shadow: 0 0 6px #23263a, 0 0 2px #c6ff00;
+        }
+
+        .match-info {
+            text-align: center;
+            margin-top: 8px;
+            color: #b0b0b0;
+            font-size: 0.98rem;
+        }
+
+        .neon-btn {
+            background: #e6ff00;
+            color: #10121a;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 28px;
+            font-size: 1rem;
+            font-weight: bold;
+            box-shadow: 0 0 8px #e6ff00, 0 0 2px #fff;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .neon-btn:hover {
+            background: #fff;
+            color: #10121a;
+        }
+
         .match-list { display: flex; flex-wrap: wrap; gap: 2rem; justify-content: center; margin-top: 2rem; }
         .match-card { border: 1px solid #ddd; border-radius: 10px; padding: 1rem 2rem; background: #fff; box-shadow: 0 2px 8px #eee; display: flex; align-items: center; cursor: pointer; transition: box-shadow 0.2s; }
         .match-card:hover { box-shadow: 0 4px 16px #ccc; }
-        .team-logo { width: 48px; height: 48px; object-fit: contain; margin: 0 1rem; }
-        .vs { font-weight: bold; font-size: 1.2rem; color: #333; }
         .match-time { font-size: 0.95rem; color: #666; margin-left: 1rem; }
+
+        @media (max-width: 600px) {
+            .match-list-item {
+                min-width: unset;
+                max-width: 98vw;
+                padding: 18px 6vw;
+            }
+            .teams {
+                font-size: 1.1rem;
+                gap: 10px;
+            }
+            .team-logo {
+                width: 36px;
+                height: 36px;
+            }
+        }
     </style>
 </head>
 <body>
+    <div class="select-container">
+        <img src="{{ url_for('static', filename='images/logo.png') }}" class="logo" />
+        <h1>Select a Match</h1>
+        <div class="matches-list">
+            {% for match in matches %}
+                <div class="match-list-item" onclick="selectMatch({{ match.fixture_id }})">
+                    <div class="teams">
+                        <img src="{{ match.team1_logo_url }}" class="team-logo" alt="{{ match.team1_name }}">
+                        <span class="team-name">{{ match.team1_name }}</span>
+                        <span class="vs">vs</span>
+                        <span class="team-name">{{ match.team2_name }}</span>
+                        <img src="{{ match.team2_logo_url }}" class="team-logo" alt="{{ match.team2_name }}">
+                    </div>
+                    <div class="match-info">
+                        <span class="match-time">{{ match.date }}</span>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
     <h2 style="text-align:center; margin-top:2rem;">Select a Match to View Predictions</h2>
-    <div id="top5-predictions" style="max-width:800px;margin:2rem auto;"></div>
-    <div id="match-list" class="match-list"></div>
+    <div id="top3-predictions" class="match-list" style="margin-bottom:2rem;"></div>
     <button id="show-all-predictions" style="display:block;margin:2rem auto;">Show All Predictions</button>
     <div id="all-predictions" style="max-width:900px;margin:2rem auto;"></div>
     <script>
-        async function fetchTop5Predictions() {
-            const res = await fetch('/api/top5-today-predictions');
+        async function fetchTop3Predictions() {
+            const res = await fetch('/api/top3-today-predictions-details');
             const data = await res.json();
-            const container = document.getElementById('top5-predictions');
-            if (data.status !== 'success' || !data.top5_predictions || !data.top5_predictions.length) {
-                container.innerHTML = '<p>No top 5 predictions available.</p>';
+            const container = document.getElementById('top3-predictions');
+            if (!Array.isArray(data) || !data.length) {
+                container.innerHTML = '<p>No top 3 predictions available.</p>';
                 return;
             }
-            let html = '<h3>Top 5 Predictions (by Confidence)</h3>';
-            html += '<ol>';
-            for (const pred of data.top5_predictions) {
-                html += `<li><b>Winner:</b> ${pred["Winner Team Name"] || pred["winner"] || '-'} | <b>Prediction:</b> ${pred["Prediction"] || pred["prediction"] || '-'} | <b>Confidence:</b> ${pred["Confidence"] || pred["confidence"] || '-'} | <b>Probability:</b> ${pred["A win probability estimate (in %)"] || pred["win_probability"] || '-'} </li>`;
+            container.innerHTML = '';
+            for (const match of data) {
+                const card = document.createElement('div');
+                card.className = 'match-card';
+                card.innerHTML = `
+                    <img src="${match.team1.logo_url || '/static/images/logo.png'}" class="team-logo" alt="${match.team1.name}">
+                    <span>${match.team1.name}</span>
+                    <span class="vs">vs</span>
+                    <span>${match.team2.name}</span>
+                    <img src="${match.team2.logo_url || '/static/images/logo.png'}" class="team-logo" alt="${match.team2.name}">
+                    <span class="match-time">${match.starting_at}</span>
+                    <span style='margin-left:1rem;'><b>Predicted:</b> ${match.prediction.predicted_winner || '-'}</span>
+                    <span style='margin-left:1rem;'><b>Win %:</b> ${match.prediction.win_probability || '-'}</span>
+                `;
+                card.onclick = () => {
+                    window.location.href = `/match-details/${match.fixture_id}`;
+                };
+                container.appendChild(card);
             }
-            html += '</ol>';
-            container.innerHTML = html;
         }
         async function fetchAllPredictions() {
             const btn = document.getElementById('show-all-predictions');
@@ -65,43 +217,7 @@
             return await res.json();
         }
 
-        async function fetchMatches() {
-            const res = await fetch('/api/today-matches-list');
-            const matches = await res.json();
-            const list = document.getElementById('match-list');
-            if (!matches.length) {
-                list.innerHTML = '<p>No matches found for today.</p>';
-                return;
-            }
-            for (const match of matches) {
-                const details = await fetchFixtureDetails(match.fixture_id);
-                if (details.error) continue;
-                const card = document.createElement('div');
-                card.className = 'match-card';
-                card.innerHTML = `
-                    <img src="${details.home_logo}" class="team-logo" alt="${details.home_team}">
-                    <span>${details.home_team}</span>
-                    <span class="vs">vs</span>
-                    <span>${details.away_team}</span>
-                    <img src="${details.away_logo}" class="team-logo" alt="${details.away_team}">
-                    <span class="match-time">${details.starting_at.replace('T', ' ').slice(0, 16)}</span>
-                `;
-                card.onclick = async () => {
-                    const resp = await fetch('/api/select-match', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ fixture_id: match.fixture_id })
-                    });
-                    const data = await resp.json();
-                    if (data.redirect) {
-                        window.location.href = data.redirect;
-                    }
-                };
-                list.appendChild(card);
-            }
-        }
-        fetchMatches();
-        fetchTop5Predictions();
+        fetchTop3Predictions();
     </script>
 </body>
 </html> 

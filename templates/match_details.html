@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Match Details</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body { background: #f5f6fa; }
+        .details-container { max-width: 700px; margin: 2rem auto; background: #fff; border-radius: 14px; box-shadow: 0 2px 16px #e0e0e0; padding: 2.5rem 2rem; }
+        .teams { display: flex; align-items: center; justify-content: center; gap: 2rem; margin-bottom: 2rem; }
+        .team-logo { width: 72px; height: 72px; object-fit: contain; border-radius: 50%; background: #f0f0f0; border: 2px solid #e0e0e0; }
+        .vs {
+            font-weight: bold;
+            font-size: 1.3em;
+            margin: 0 12px;
+            background: linear-gradient(90deg, #e6ff00 0%, #fff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 6px #23263a;
+        }
+        .fixture-name { text-align: center; font-size: 1.3rem; font-weight: 600; margin-bottom: 1.2rem; color: #222; }
+        .prediction-card { background: #f8fafd; border-radius: 10px; box-shadow: 0 1px 4px #e0e0e0; padding: 1.5rem 1.2rem; margin-top: 2rem; }
+        .prediction-row { display: flex; justify-content: space-between; margin-bottom: 1rem; }
+        .prediction-label { font-weight: 500; color: #555; }
+        .prediction-value { font-weight: 600; color: #222; }
+        .explanation { background: #f0f4f8; border-left: 4px solid #0077ff; padding: 1rem; border-radius: 6px; color: #333; margin-top: 1.2rem; }
+        .kickoff { text-align: center; color: #888; margin-top: 0.5rem; font-size: 1.05rem; }
+    </style>
+</head>
+<body>
+    <div class="details-container">
+        <div class="fixture-name" id="fixture-name"></div>
+        <div class="teams">
+            <div style="text-align:center;">
+                <img id="team1-logo" class="team-logo" src="" alt="Team 1">
+                <div id="team1-name"></div>
+            </div>
+            <span class="vs">vs</span>
+            <div style="text-align:center;">
+                <img id="team2-logo" class="team-logo" src="" alt="Team 2">
+                <div id="team2-name"></div>
+            </div>
+        </div>
+        <div class="kickoff" id="kickoff-time"></div>
+        <div class="prediction-card">
+            <div class="prediction-row"><span class="prediction-label">Predicted Winner:</span> <span class="prediction-value" id="predicted-winner"></span></div>
+            <div class="prediction-row"><span class="prediction-label">Win Probability:</span> <span class="prediction-value" id="win-probability"></span></div>
+            <div class="prediction-row"><span class="prediction-label">Confidence Level:</span> <span class="prediction-value" id="confidence-level"></span></div>
+            <div class="prediction-row"><span class="prediction-label">Fixture:</span> <span class="prediction-value" id="fixture"></span></div>
+            <div class="explanation"><b>Explanation:</b> <span id="explanation"></span></div>
+        </div>
+    </div>
+    <script>
+        async function fetchFixtureLogos(fixtureId) {
+            // Fetch logos from the API as in select_match
+            const res = await fetch(`/api/fixture-details/${fixtureId}`);
+            if (!res.ok) return { home_logo: '', away_logo: '', home_team: '', away_team: '', starting_at: '' };
+            return await res.json();
+        }
+        async function loadMatchDetails() {
+            const fixtureId = window.location.pathname.split('/').pop();
+            // Fetch prediction details
+            const res = await fetch(`/api/prediction-details/${fixtureId}`);
+            const data = await res.json();
+            if (data.error || data.status === 'error') {
+                document.body.innerHTML = `<p style='color:red;text-align:center;'>${data.error || data.message}</p>`;
+                return;
+            }
+            // Try to parse the raw_gpt_response if it's a stringified JSON
+            let predData = {};
+            try {
+                predData = typeof data.prediction.raw_gpt_response === 'string' ? JSON.parse(data.prediction.raw_gpt_response) : data.prediction.raw_gpt_response;
+            } catch (e) {
+                predData = data.prediction.raw_gpt_response || {};
+            }
+            // Fetch logos and team names from API
+            const logos = await fetchFixtureLogos(fixtureId);
+            document.getElementById('team1-logo').src = logos.home_logo || '/static/images/logo.png';
+            document.getElementById('team2-logo').src = logos.away_logo || '/static/images/logo.png';
+            document.getElementById('team1-name').textContent = logos.home_team || (data.team1 && data.team1.name) || '-';
+            document.getElementById('team2-name').textContent = logos.away_team || (data.team2 && data.team2.name) || '-';
+            document.getElementById('fixture-name').textContent = predData.fixture || `${logos.home_team || ''} vs ${logos.away_team || ''}`;
+            document.getElementById('kickoff-time').textContent = predData.kickoff_time ? `Kickoff: ${predData.kickoff_time}` : (logos.starting_at ? `Kickoff: ${logos.starting_at}` : '');
+            document.getElementById('predicted-winner').textContent = predData.predicted_winner || data.prediction.predicted_winner || '-';
+            document.getElementById('win-probability').textContent = (predData.win_probability || data.prediction.win_probability || '-') + (predData.win_probability ? '%' : '');
+            document.getElementById('confidence-level').textContent = predData.confidence_level || '-';
+            document.getElementById('fixture').textContent = predData.fixture || '-';
+            document.getElementById('explanation').textContent = predData.explanation || '-';
+        }
+        loadMatchDetails();
+    </script>
+</body>
+</html> 

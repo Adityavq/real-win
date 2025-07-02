@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, session
 import requests
-from livematches import fetch_today_football_fixtures, fetch_today_matches_with_team_info
+from livematches import fetch_today_football_fixtures, fetch_today_matches_with_team_info, get_team_logo
 from flask import Flask, g, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
@@ -14,11 +14,12 @@ from fotball import  get_participant_team_ids, gpt_chatbot, get_top5_predictions
 from datetime import datetime
 from models import db  # Import SQLAlchemy db instance
 from urllib.parse import quote_plus
+from models import Team, Match, Prediction, TopPrediction
+from flask_migrate import Migrate
 
 app = Flask(__name__)
 app.secret_key = 'e3c2d2a1bb4a6e34f2e2b6a30d7c9af41e2f96c8595c8c7a623ebd47d8df0f30'
 
-# SQLAlchemy configuration for PostgreSQL
 password = quote_plus(config.DB_PASSWORD)
 app.config['SQLALCHEMY_DATABASE_URI'] = f"postgresql://{config.DB_USER}:{password}@{config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -27,6 +28,8 @@ db.init_app(app)
 
 with app.app_context():
     db.create_all()
+
+migrate = Migrate(app, db)
 
 def login_required(f):
     @wraps(f)
@@ -64,7 +67,23 @@ def logout():
 @app.route('/api/today-matches-list', methods=['GET'])
 @login_required
 def today_matches_list():
-    matches = fetch_today_matches_with_team_info()
+    from models import TopPrediction, Prediction, Match, Team
+    today = datetime.now().strftime('%Y-%m-%d')
+    top_preds = TopPrediction.query.filter_by(date=today).all()
+    matches = []
+    for top_pred in top_preds:
+        pred = Prediction.query.get(top_pred.prediction_id)
+        match = Match.query.get(pred.match_id)
+        team1 = Team.query.get(match.team1_id)
+        team2 = Team.query.get(match.team2_id)
+        matches.append({
+            'fixture_id': match.id,
+            'team1_id': team1.id,
+            'team1_name': team1.name,
+            'team2_id': team2.id,
+            'team2_name': team2.name,
+            'date': str(match.date)
+        })
     return jsonify(matches)
 
 @app.route('/api/signup', methods=['POST'])
@@ -207,45 +226,260 @@ def all_today_predictions():
     try:
         today = datetime.now().strftime('%Y-%m-%d')
         matches = fetch_all_matches_for_date(today)
-        print(f"Found {len(matches)} matches for today")
         predictions = []
         league_cache = {}
         notes = "Automated prediction for all matches of the day."
+        matches = matches[:1]
         for match in matches:
             fixture_id = match.get("id")
             starting_at = match.get("starting_at")
             if not fixture_id or not starting_at:
                 continue
             participant_data = get_participant_team_ids(fixture_id)
+            print("participant_data",participant_data)
             if not participant_data:
                 continue
             team_id_A = participant_data["team_a_id"]
             team_id_B = participant_data["team_b_id"]
+            team_a = Team.query.filter_by(id=team_id_A).first()
+            if not team_a:
+                team_a_name = f"Team {team_id_A}"
+                team_a_logo = get_team_logo(team_a_name)
+                team_a = Team(id=team_id_A, name=team_a_name, logo_url=team_a_logo)
+                db.session.add(team_a)
+            team_b = Team.query.filter_by(id=team_id_B).first()
+            if not team_b:
+                team_b_name = f"Team {team_id_B}"
+                team_b_logo = get_team_logo(team_b_name)
+                team_b = Team(id=team_id_B, name=team_b_name, logo_url=team_b_logo)
+                db.session.add(team_b)
+            db.session.flush()
+            match_obj = Match.query.filter_by(id=fixture_id).first()
+            if not match_obj:
+                match_obj = Match(id=fixture_id, team1_id=team_id_A, team2_id=team_id_B, date=today)
+                db.session.add(match_obj)
+            db.session.flush()
+            # Get prediction
             try:
                 match_date = datetime.strptime(starting_at, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y")
             except Exception:
                 match_date = starting_at
             prediction_str = gpt_chatbot(team_id_A, team_id_B, match_date, notes, league_cache)
-            prediction = parse_gpt_prediction(prediction_str)
-            prediction["fixture_id"] = fixture_id
-            prediction["starting_at"] = starting_at
-            prediction["raw_gpt_response"] = prediction_str
-            predictions.append(prediction)
-        def get_sort_key(pred):
-            prob = pred.get("A win probability estimate (in %)") or pred.get("win_probability")
-            try:
-                return float(str(prob).replace("%", ""))
-            except:
-                conf = (pred.get("Confidence") or pred.get("confidence") or "").lower()
-                return {"high": 100, "medium": 60, "low": 30}.get(conf, 0)
-        predictions.sort(key=get_sort_key, reverse=True)
+            prediction_data = parse_gpt_prediction(prediction_str)
+            # Save Prediction
+            predicted_winner_name = prediction_data.get("predicted_winner")
+            predicted_winner = Team.query.filter_by(name=predicted_winner_name).first()
+            if not predicted_winner:
+                predicted_winner_logo = get_team_logo(predicted_winner_name)
+                predicted_winner = Team(name=predicted_winner_name, logo_url=predicted_winner_logo)
+                db.session.add(predicted_winner)
+            db.session.flush()
+            confidence = float(prediction_data.get("win_probability", 0))
+            pred = Prediction(
+                match_id=fixture_id,
+                confidence=confidence,
+                predicted_winner_id=predicted_winner.id,
+                data_points=str(prediction_data)
+            )
+            db.session.add(pred)
+            db.session.flush()
+            prediction_data["fixture_id"] = fixture_id
+            prediction_data["starting_at"] = starting_at
+            prediction_data["raw_gpt_response"] = prediction_str
+            prediction_data["db_prediction_id"] = pred.id
+            predictions.append(prediction_data)
+            
+        # Sort and save top 3 predictions
+        predictions.sort(key=lambda x: float(x.get("win_probability", 0)), reverse=True)
+        top3 = predictions[:5]
+        for pred_data in top3:
+            top_pred = TopPrediction(
+                prediction_id=pred_data["db_prediction_id"],
+                date=today
+            )
+            db.session.add(top_pred)
+        db.session.commit()
         return jsonify({
             "status": "success",
             "date": today,
-            "predictions": predictions
+            "predictions": predictions,
+            "top3": top3
         })
     except Exception as e:
+        db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
 
+def run_and_store_all_today_predictions():
+    global predictions_cache
+    try:
+        today = datetime.now().strftime('%Y-%m-%d')
+        matches = fetch_all_matches_for_date(today)
+        predictions = []
+        league_cache = {}
+        notes = "Automated prediction for all matches of the day."
+        matches = matches[:4]
+        for match in matches:
+            fixture_id = match.get("id")
+            starting_at = match.get("starting_at")
+            if not fixture_id or not starting_at:
+                continue
+            participant_data = get_participant_team_ids(fixture_id)
+            print("participant_data",participant_data)
+            if not participant_data:
+                continue
+            team_id_A = participant_data["team_a_id"]
+            team_id_B = participant_data["team_b_id"]
+            team_a = Team.query.filter_by(id=team_id_A).first()
+            if not team_a:
+                team_a_name = f"Team {team_id_A}"
+                team_a_logo = get_team_logo(team_a_name)
+                team_a = Team(id=team_id_A, name=team_a_name, logo_url=team_a_logo)
+                db.session.add(team_a)
+            team_b = Team.query.filter_by(id=team_id_B).first()
+            if not team_b:
+                team_b_name = f"Team {team_id_B}"
+                team_b_logo = get_team_logo(team_b_name)
+                team_b = Team(id=team_id_B, name=team_b_name, logo_url=team_b_logo)
+                db.session.add(team_b)
+            db.session.flush()
+            match_obj = Match.query.filter_by(id=fixture_id).first()
+            if not match_obj:
+                match_obj = Match(id=fixture_id, team1_id=team_id_A, team2_id=team_id_B, date=today)
+                db.session.add(match_obj)
+            db.session.flush()
+            # Get prediction
+            try:
+                match_date = datetime.strptime(starting_at, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y")
+            except Exception:
+                match_date = starting_at
+            prediction_str = gpt_chatbot(team_id_A, team_id_B, match_date, notes, league_cache)
+            prediction_data = parse_gpt_prediction(prediction_str)
+            # Save Prediction
+            predicted_winner_name = prediction_data.get("predicted_winner")
+            predicted_winner = Team.query.filter_by(name=predicted_winner_name).first()
+            if not predicted_winner:
+                predicted_winner_logo = get_team_logo(predicted_winner_name)
+                predicted_winner = Team(name=predicted_winner_name, logo_url=predicted_winner_logo)
+                db.session.add(predicted_winner)
+            db.session.flush()
+            confidence = float(prediction_data.get("win_probability", 0))
+            pred = Prediction(
+                match_id=fixture_id,
+                confidence=confidence,
+                predicted_winner_id=predicted_winner.id,
+                data_points=prediction_str
+            )
+            db.session.add(pred)
+            db.session.flush()
+            prediction_data["fixture_id"] = fixture_id
+            prediction_data["starting_at"] = starting_at
+            prediction_data["raw_gpt_response"] = prediction_str
+            prediction_data["db_prediction_id"] = pred.id
+            predictions.append(prediction_data)
+        # Remove duplicate TopPrediction for the same fixture/date
+        today_date = datetime.now().date()
+        TopPrediction.query.filter_by(date=today_date).delete()
+        db.session.commit()
+        # Sort and save top 3 unique predictions
+        unique_preds = []
+        seen_fixtures = set()
+        for pred_data in sorted(predictions, key=lambda x: float(x.get("win_probability", 0)), reverse=True):
+            if pred_data["fixture_id"] in seen_fixtures:
+                continue
+            seen_fixtures.add(pred_data["fixture_id"])
+            unique_preds.append(pred_data)
+            if len(unique_preds) == 3:
+                break
+        for pred_data in unique_preds:
+            top_pred = TopPrediction(
+                prediction_id=pred_data["db_prediction_id"],
+                date=today_date
+            )
+            db.session.add(top_pred)
+        db.session.commit()
+        predictions_cache = {
+            "status": "success",
+            "date": today,
+            "predictions": predictions,
+            "top3": unique_preds
+        }
+    except Exception as e:
+        db.session.rollback()
+        predictions_cache = {"status": "error", "message": str(e)}
+
+@app.route('/api/top3-today-predictions-details', methods=['GET'])
+def top3_today_predictions_details():
+    try:
+        today = datetime.now().strftime('%Y-%m-%d')
+        top_preds = TopPrediction.query.filter_by(date=today).order_by(TopPrediction.id.desc()).all()
+        result = []
+        seen_fixtures = set()
+        for top_pred in top_preds:
+            pred = Prediction.query.get(top_pred.prediction_id)
+            match = Match.query.get(pred.match_id)
+            if match.id in seen_fixtures:
+                continue
+            seen_fixtures.add(match.id)
+            # Fetch logos from external API as in /api/fixture-details
+            api_token = os.getenv("API_TOKEN") or "YOUR_API_TOKEN"
+            url = f"https://api.sportmonks.com/v3/football/fixtures/{match.id}?api_token={api_token}&include=participants"
+            res = requests.get(url)
+            data = res.json()
+            participants = data.get("data", {}).get("participants", [])
+            home_logo = None
+            away_logo = None
+            if len(participants) >= 2:
+                home_logo = participants[0].get("image_path")
+                away_logo = participants[1].get("image_path")
+            result.append({
+                'fixture_id': match.id,
+                'team1': {'id': match.team1_id, 'name': Team.query.get(match.team1_id).name, 'logo_url': home_logo},
+                'team2': {'id': match.team2_id, 'name': Team.query.get(match.team2_id).name, 'logo_url': away_logo},
+                'prediction': {
+                    'predicted_winner': Team.query.get(pred.predicted_winner_id).name if pred.predicted_winner_id else None,
+                    'win_probability': pred.confidence,
+                    'raw_gpt_response': pred.data_points
+                },
+                'starting_at': str(match.date)
+            })
+            if len(result) == 3:
+                break
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/prediction-details/<int:fixture_id>', methods=['GET'])
+def prediction_details(fixture_id):
+    try:
+        match = Match.query.get(fixture_id)
+        if not match:
+            return jsonify({'error': 'Match not found'}), 404
+        team1 = Team.query.get(match.team1_id)
+        team2 = Team.query.get(match.team2_id)
+        pred = Prediction.query.filter_by(match_id=fixture_id).order_by(Prediction.id.desc()).first()
+        if not pred:
+            return jsonify({'error': 'Prediction not found'}), 404
+        predicted_winner = Team.query.get(pred.predicted_winner_id)
+        return jsonify({
+            'fixture_id': match.id,
+            'team1': {'id': team1.id, 'name': team1.name, 'logo_url': team1.logo_url},
+            'team2': {'id': team2.id, 'name': team2.name, 'logo_url': team2.logo_url},
+            'prediction': {
+                'predicted_winner': predicted_winner.name if predicted_winner else None,
+                'win_probability': pred.confidence,
+                'raw_gpt_response': pred.data_points
+            },
+            'starting_at': str(match.date)
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/match-details/<int:fixture_id>')
+@login_required
+def match_details_page(fixture_id):
+    return render_template('match_details.html')
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    with app.app_context():
+        run_and_store_all_today_predictions()
+    app.run(debug=True,host='0.0.0.0',port=5000)
