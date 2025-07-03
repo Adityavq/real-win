@@ -127,7 +127,9 @@ body {
   padding: 20px;
   border-radius: 12px;
 }
-
+.recent h2{
+  margin-bottom: 0px;
+}
 table {
   width: 100%;
   border-collapse: collapse;
@@ -176,7 +178,9 @@ section.recent table {
 .table_outer {
   overflow-y: auto;
 }
-
+.row1,.row2{
+  text-align: center;
+}
 .logo_outer {
   width: 100%;
   max-width: 200px;

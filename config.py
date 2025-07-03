@@ -8,6 +8,7 @@ API_TOKEN = os.getenv('API_TOKEN')
 # Database configuration: load from environment, fallback to local defaults
 DB_HOST = os.getenv('DB_HOST', 'localhost')
 DB_NAME = os.getenv('DB_NAME', 'realwin')
+print(DB_NAME)
 DB_USER = os.getenv('DB_USER', 'postgres')
 DB_PASSWORD = os.getenv('DB_PASSWORD', 'A@ditya3815')
 DB_PORT = int(os.getenv('DB_PORT', 5432))

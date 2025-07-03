@@ -13,7 +13,7 @@
         <div class="container">
             <div class="header-inner">
                 <div class="logo_outer">
-                     <img src="static/images/logo.png" class="logo" alt="">
+                     <img src="/static/images/logo.png" class="logo" alt="">
                 </div>
                
                 <a href="/logout" class="logout">Logout</a>
@@ -27,22 +27,30 @@
                     <h2>Today's Prediction</h2>
                     <div class="match-info">
                         <div class="team">
-                            <img src="static/images/arsenal_FC.svg" alt="arsenal" />
-                            <p>Arsenal</p>
+                            <img src="{{ teams[0].logo_url }}" alt="{{ teams[0].name }}" />
+                            <p>{{ teams[0].name }}</p>
                         </div>
                         <div class="vs">VS</div>
                         <div class="team">
-                            <img src="static/images/chelsea_FC.svg" alt="chelsea" />
-                            <p>Chelsea</p>
+                            <img src="{{ teams[1].logo_url }}" alt="{{ teams[1].name }}" />
+                            <p>{{ teams[1].name }}</p>
                         </div>
                     </div>
-                    <div class="prediction">Prediction: <span>ARSENAL TO WIN</span></div>
-                    <div class="time">20:00</div>
+                    <div class="prediction">Prediction <span>{{ parsed_gpt.predicted_winner }} TO WIN</span></div>
+                    <div class="time">{{ parsed_gpt.kickoff_time }}</div>
                 </section>
 
                 <section class="performance-box">
                     <h2>Performance</h2>
-                  
+                    <div class="performance-detail">
+                        <p><strong>Fixture:</strong> {{ parsed_gpt.fixture }}</p>
+                        <p><strong>Confidence Level:</strong> {{ parsed_gpt.confidence_level }}</p>
+                        <p><strong>Explanation:</strong></p>
+                        <p>{{ parsed_gpt.explanation }}</p>
+                        <p><strong>Predicted Winner:</strong> {{ parsed_gpt.predicted_winner }}</p>
+                        <p><strong>Win Probability:</strong> {{ parsed_gpt.win_probability }}%</p>
+                        <p><strong>Kickoff Time:</strong> {{ parsed_gpt.kickoff_time }}</p>
+                    </div>
                 </section>
             </div>
 

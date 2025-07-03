@@ -6,16 +6,18 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
 import config
 import os
+from flask_migrate import upgrade
 from flask import redirect, url_for
 from functools import wraps
 from flask import Flask, render_template
-from config import db_connection
+from config import db_connection, API_TOKEN
 from fotball import  get_participant_team_ids, gpt_chatbot, get_top5_predictions_for_date, fetch_all_matches_for_date, parse_gpt_prediction
-from datetime import datetime
+from datetime import datetime, timedelta
 from models import db  # Import SQLAlchemy db instance
 from urllib.parse import quote_plus
 from models import Team, Match, Prediction, TopPrediction
 from flask_migrate import Migrate
+
 
 app = Flask(__name__)
 app.secret_key = 'e3c2d2a1bb4a6e34f2e2b6a30d7c9af41e2f96c8595c8c7a623ebd47d8df0f30'
@@ -24,7 +26,9 @@ password = quote_plus(config.DB_PASSWORD)
 app.config['SQLALCHEMY_DATABASE_URI'] = f"postgresql://{config.DB_USER}:{password}@{config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# db.init_app(app)
 db.init_app(app)
+migrate = Migrate(app, db)
 
 with app.app_context():
     db.create_all()
@@ -47,17 +51,107 @@ def signup_page():
 def sigin_page():
     return render_template('login.html')
 
+import json
 @app.route('/select-match')
 @login_required
 def select_match_page():
-    return render_template('select_match.html')
+    try:
+        today = datetime.now().strftime('%Y-%m-%d')
+        top_preds = TopPrediction.query.filter_by(date=today).order_by(TopPrediction.id.desc()).all()
+        result = []
+        seen_fixtures = set()
 
-@app.route('/home')
+        for top_pred in top_preds:
+            pred = Prediction.query.get(top_pred.prediction_id)
+            match = Match.query.get(pred.match_id)
+            if match.id in seen_fixtures:
+                continue
+            seen_fixtures.add(match.id)
+
+            try:
+                # Parse GPT JSON safely
+                gpt_data = json.loads(pred.data_points.replace("'", "\""))
+                fixture = gpt_data.get("fixture", "Unknown Fixture")
+                predicted_winner = gpt_data.get("predicted_winner")
+                explanation = gpt_data.get("explanation", "No prediction")
+                kickoff_time_str = gpt_data.get("kickoff_time")
+
+                # Format kickoff time
+                kickoff_time = "N/A"
+                if kickoff_time_str:
+                    dt = datetime.strptime(kickoff_time_str, "%Y-%m-%d %H:%M:%S %Z")
+                    kickoff_time = dt.strftime("%H:%M")
+                result.append({
+                    "fixture": fixture,
+                    "prediction": f"{predicted_winner} to win" if predicted_winner else explanation,
+                    "kickoff_time": kickoff_time,
+                    "fixture_id": match.id
+                    
+                })
+            except Exception as e:
+                print(f"Error parsing GPT data: {e}")
+                continue
+
+            if len(result) == 3:
+                break
+
+        return render_template('responsive.html', matches=result)
+
+    except Exception as e:
+        return render_template('responsive.html', matches=[], error=str(e))
+
+
+# @app.route('/home')
+@app.route('/api/fixture-details/<int:fixture_id>', methods=['GET'])
 @login_required
-def home_page():
-    if 'selected_fixture_id' not in session:
-        return redirect(url_for('select_match_page'))
-    return render_template('index.html')
+def home_page(fixture_id):
+    try:
+    
+        # Get prediction for fixture
+        prediction = Prediction.query.filter_by(match_id=fixture_id).first()
+        if not prediction:
+            return redirect(url_for('select_match_page'))
+
+        # Parse GPT response safely
+        try:
+            gpt_data = json.loads(prediction.data_points.replace("'", "\""))
+        except Exception as e:
+            gpt_data = {}
+            print(f"Error parsing GPT data: {e}")
+
+        # Call Sportmonks API to get participants
+        api_token = os.getenv("API_TOKEN") or "YOUR_API_TOKEN"
+        url = f"https://api.sportmonks.com/v3/football/fixtures/{fixture_id}?api_token={api_token}&include=participants"
+        res = requests.get(url)
+
+        participants = []
+        if res.status_code == 200:
+            data = res.json().get("data", {})
+            participants = data.get("participants", [])
+
+        team_logos = []
+        for team in participants:
+            team_logos.append({
+                "name": team.get("name"),
+                "logo_url": team.get("image_path")
+            })
+
+        print(gpt_data)
+        # return jsonify({
+        #     "fixture_id": fixture_id,
+        #     "raw_gpt_response": prediction.data_points,
+        #     "parsed_gpt": gpt_data,
+        #     "teams": team_logos
+        # })
+        # Pass data to the HTML template
+        return render_template("index.html", 
+            raw_gpt_response=prediction.data_points,
+            parsed_gpt=gpt_data,
+            teams=team_logos)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500  
+
 
 @app.route('/logout')
 def logout():
@@ -200,26 +294,54 @@ def top5_today_predictions():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/api/fixture-details/<int:fixture_id>', methods=['GET'])
-@login_required
-def fixture_details(fixture_id):
-    api_token = os.getenv("API_TOKEN") or "YOUR_API_TOKEN"
-    url = f"https://api.sportmonks.com/v3/football/fixtures/{fixture_id}?api_token={api_token}&include=participants"
-    res = requests.get(url)
-    data = res.json()
-    participants = data.get("data", {}).get("participants", [])
-    if len(participants) >= 2:
-        home = participants[0]
-        away = participants[1]
-        return jsonify({
-            "home_team": home.get("name"),
-            "home_logo": home.get("image_path"),
-            "away_team": away.get("name"),
-            "away_logo": away.get("image_path"),
-            "starting_at": data.get("data", {}).get("starting_at"),
-            "fixture_id": fixture_id
-        })
-    return jsonify({"error": "Participants not found"}), 404
+@app.route('/api/fixture-detailsss/<int:fixture_id>', methods=['GET'])
+# @login_required
+def fixture_prediction_details(fixture_id):
+    try:
+        # Get prediction for fixture
+        prediction = Prediction.query.filter_by(match_id=fixture_id).first()
+        if not prediction:
+            return jsonify({"error": "Prediction not found"}), 404
+
+        # Parse GPT response safely
+        try:
+            gpt_data = json.loads(prediction.data_points.replace("'", "\""))
+        except Exception as e:
+            gpt_data = {}
+            print(f"Error parsing GPT data: {e}")
+
+        # Call Sportmonks API to get participants
+        api_token = os.getenv("API_TOKEN") or "YOUR_API_TOKEN"
+        url = f"https://api.sportmonks.com/v3/football/fixtures/{fixture_id}?api_token={api_token}&include=participants"
+        res = requests.get(url)
+
+        participants = []
+        if res.status_code == 200:
+            data = res.json().get("data", {})
+            participants = data.get("participants", [])
+
+        team_logos = []
+        for team in participants:
+            team_logos.append({
+                "name": team.get("name"),
+                "logo_url": team.get("image_path")
+            })
+
+        # return jsonify({
+        #     "fixture_id": fixture_id,
+        #     "raw_gpt_response": prediction.data_points,
+        #     "parsed_gpt": gpt_data,
+        #     "teams": team_logos
+        # })
+        # Pass data to the HTML template
+        return render_template("index.html", 
+            fixture_id=fixture_id,
+            raw_gpt_response=prediction.data_points,
+            parsed_gpt=gpt_data,
+            teams=team_logos)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/all-today-predictions", methods=["GET"])
 def all_today_predictions():
@@ -312,7 +434,8 @@ def all_today_predictions():
 def run_and_store_all_today_predictions():
     global predictions_cache
     try:
-        today = datetime.now().strftime('%Y-%m-%d')
+        # today = datetime.now().strftime('%Y-%m-%d')
+        today = "2025-07-02"
         matches = fetch_all_matches_for_date(today)
         predictions = []
         league_cache = {}
@@ -367,7 +490,8 @@ def run_and_store_all_today_predictions():
                 match_id=fixture_id,
                 confidence=confidence,
                 predicted_winner_id=predicted_winner.id,
-                data_points=prediction_str
+                data_points=prediction_str,
+                created_at=datetime.utcnow()
             )
             db.session.add(pred)
             db.session.flush()
@@ -477,9 +601,147 @@ def prediction_details(fixture_id):
 @app.route('/match-details/<int:fixture_id>')
 @login_required
 def match_details_page(fixture_id):
-    return render_template('match_details.html')
+    return render_template('index.html')
+
+@app.route("/api/last_predections", methods=["GET"])
+def get_predictions_list():
+    try:
+        conn = db_connection()
+        cur = conn.cursor()
+
+        # Calculate yesterday and today
+        today = datetime.now().date()
+        yesterday = today - timedelta(days=1)
+
+        # Try fetching from yesterday first
+        cur.execute("""
+            SELECT id, match_id, confidence, predicted_winner_id, winner_result, data_points, created_at
+            FROM predictions
+            WHERE DATE(created_at) = %s
+            ORDER BY confidence DESC
+            LIMIT 5
+        """, (yesterday,))
+        rows = cur.fetchall()
+
+        # If no predictions found for yesterday, fallback to today
+        if not rows:
+            cur.execute("""
+                SELECT id, match_id, confidence, predicted_winner_id, winner_result, data_points, created_at
+                FROM predictions
+                WHERE DATE(created_at) = %s
+                ORDER BY confidence DESC
+                LIMIT 5
+            """, (today,))
+            rows = cur.fetchall()
+
+        cur.close()
+        conn.close()
+
+        predictions = []
+        for row in rows:
+            predictions.append({
+                'id': row[0],
+                'match_id': row[1],
+                'confidence': float(row[2]),
+                'predicted_winner_id': row[3],
+                'winner_result': row[4],
+                'data_points': row[5],
+                'created_at': row[6].strftime('%Y-%m-%d %H:%M:%S') if row[6] else None
+            })
+
+        return jsonify(predictions), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+
+
+@app.route("/api/update_winner_results", methods=["POST"])
+def update_winner_results():
+    try:
+        today = datetime.now().date()
+        yesterday = today - timedelta(days=1)
+
+        conn = db_connection()
+        cur = conn.cursor()
+
+        # Get top 5 predictions from yesterday, fallback to today
+        cur.execute("""
+            SELECT match_id
+            FROM predictions
+            WHERE DATE(created_at) = %s
+            ORDER BY confidence DESC
+            LIMIT 5
+        """, (yesterday,))
+        rows = cur.fetchall()
+
+        if not rows:
+            cur.execute("""
+                SELECT match_id
+                FROM predictions
+                WHERE DATE(created_at) = %s
+                ORDER BY confidence DESC
+                LIMIT 5
+            """, (today,))
+            rows = cur.fetchall()
+
+        match_ids = [row[0] for row in rows]
+        cur.close()
+        conn.close()
+
+        won_count = 0
+
+        for match_id in match_ids:
+            url = f"https://api.sportmonks.com/v3/football/fixtures/{match_id}"
+            params = {"api_token": API_TOKEN}
+            response = requests.get(url, params=params)
+
+            if response.status_code != 200:
+                continue
+
+            data = response.json().get("data", {})
+            result_info = (data.get("result_info") or "").lower()
+
+            if "draw" in result_info:
+                winner_result = "draw"
+            elif "won" in result_info:
+                winner_result = "won"
+            elif "loss" in result_info or "lost" in result_info:
+                winner_result = "lost"
+            else:
+                winner_result = "unplayed"
+
+            # Count number of "won"
+            if winner_result == "won":
+                won_count += 1
+
+            # Update DB
+            prediction = Prediction.query.filter_by(match_id=match_id).first()
+            if prediction:
+                prediction.winner_result = winner_result
+                db.session.add(prediction)
+
+        db.session.commit()
+
+        total = len(match_ids)
+        success_rate = (won_count / total) * 100 if total > 0 else 0
+
+        return jsonify({
+            "message": "Winner results updated successfully.",
+            "success_rate": f"{int(success_rate)}%",
+            "total": total,
+            "won": won_count
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
-    with app.app_context():
-        run_and_store_all_today_predictions()
+    # with app.app_context():
+    #     run_and_store_all_today_predictions()
+    # if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+    #     with app.app_context():
+    #         run_and_store_all_today_predictions()
     app.run(debug=True,host='0.0.0.0',port=5000)

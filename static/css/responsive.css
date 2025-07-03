@@ -1,0 +1,143 @@
+@font-face {
+  font-family: 'Segoe UI';
+  src: url('SegoeUI.woff2') format('woff2'),
+    url('SegoeUI.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  margin: auto;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #070915;
+  color: white;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+
+  .container_2 {
+  width: 100%;
+  max-width: 400px;
+  margin: auto;
+  padding: 20px;
+  background: #0D0F1B;
+}
+
+.logo_outer{
+  width: 100%;
+}
+.logo_outer img{
+  width: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.prediction-box h2,.statics_box h2
+{
+  margin-top: 0;
+  font-size: 35px;
+  font-weight: 500;
+  text-align: center;
+}
+.main-top{
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+.main-top .prediction-box{
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-content: center;
+  gap: 10px;
+  width: 100%;
+
+}
+.prediction-box .box_1{
+  display: flex;
+  flex-direction: column;
+  padding:20px 5px;
+  background: #151924;
+  border-radius: 20px;
+  gap: 5px;
+}
+.box_1 .prediction{
+  display: flex;
+  gap: 15px;
+ 
+}
+.prediction .time{
+  font-size:20px;
+   color: rgb(190, 190, 190);
+   width: 25%;
+   padding-left: 15px;
+}
+.prediction span{
+  font-size: 20px;
+  color: #fff;
+}
+.statics_box{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 15px 0px;
+  width: 100%;
+
+}
+.statics_box h2{
+  margin-bottom: 5px;
+}
+.statics_box .success_rate{
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.success_rate .success_rate_box{
+  width: 48%;
+  background: #151924;
+  padding: 10px 0px;
+  text-align: center;
+  border-radius: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 0px;
+}
+.success_rate_box h2{
+  font-size: 56px;
+  margin: 0px;
+}
+.success_rate_box p{
+  font-size: 20px;
+  color: rgb(190, 190, 190);
+  margin: 0px;
+}
+.view_more_button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+.view_more_button button{
+  width: 100%;
+  background: #CDFF00;
+  border: none;
+  border-radius: 20px;
+  font-size: 22px;
+  height: 70px;
+  font-weight: 600;
+  margin-top: 15px;
+  font-family: sans-serif;
+}
+div#predictions-wrapper {
+  display: flex
+;
+  flex-direction: column;
+  gap: 15px;
+}

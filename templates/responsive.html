@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+</head>
+
+<body>
+    <header>
+        <div class="container_2">
+            <div class="logo_outer">
+                <img src="/static/images/logo.png" class="logo" alt="">
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="container_2">
+            <div class="main-top">
+                <section class="prediction-box">
+                    <h2>Today's Prediction</h2>
+                    <div id="predictions-wrapper">
+                        {% for match in matches %}
+                        <div class="box_1 fixture-box" data-fixture-id="{{ match.fixture_id }}">
+                            <div class="prediction">
+                                <div class="time">{{ match.kickoff_time }}</div>
+                                <span>{{ match.fixture }}</span>
+                            </div>
+                            <div class="prediction">
+                                <div class="time">prediction</div>
+                                <span>{{ match.prediction }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+
+
+                <section class="statics_box">
+                    <h2>Statistics</h2>
+
+                    <div class="success_rate">
+                        <div class="success_rate_box">
+                            <h2 id="successRate">--%</h2> <!-- 👈 Set ID here -->
+                            <p>Success rate</p>
+                        </div>
+                        <div class="success_rate_box">
+                            <h2 id="winStreak">--</h2> <!-- Optional if you get it from API -->
+                            <p>Win streak</p>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="view_more_button">
+                    <button>View More</button>
+                </div>
+            </div>
+
+
+    </main>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            fetch("/api/update_winner_results", {
+                method: "POST"
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success_rate) {
+                        document.getElementById("successRate").textContent = data.success_rate;
+                    }
+                    // Optional: if API returns win streak later
+                    // if (data.win_streak) {
+                    //     document.getElementById("winStreak").textContent = data.win_streak;
+                    // }
+                })
+                .catch(error => {
+                    console.error("Error fetching stats:", error);
+                });
+        });
+
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const boxes = document.querySelectorAll('.fixture-box');
+            boxes.forEach(box => {
+                box.addEventListener('click', function () {
+                    const fixtureId = this.getAttribute('data-fixture-id');
+                    // Redirect directly to the API endpoint
+                    window.location.href = `/api/fixture-details/${fixtureId}`;
+                });
+            });
+        });
+
+    </script>
+
+    <!-- <script src="static/js/custom.js"></script> -->
+</body>
+
+</html>

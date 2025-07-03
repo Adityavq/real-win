@@ -1,4 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
 
 db = SQLAlchemy()
 
@@ -31,7 +32,9 @@ class Prediction(db.Model):
     match_id = db.Column(db.Integer, db.ForeignKey('matches.id'), nullable=False)
     confidence = db.Column(db.Float, nullable=False)
     predicted_winner_id = db.Column(db.Integer, db.ForeignKey('teams.id'), nullable=False)
-    data_points = db.Column(db.Text)  # JSON or stringified data points
+    winner_result = db.Column(db.String(50), nullable=True)
+    data_points = db.Column(db.Text) 
+    created_at = db.Column(db.DateTime, nullable=True)
     match = db.relationship('Match')
     predicted_winner = db.relationship('Team', foreign_keys=[predicted_winner_id])
 

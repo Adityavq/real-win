@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Select Today Match</title>
@@ -112,10 +113,35 @@
             color: #10121a;
         }
 
-        .match-list { display: flex; flex-wrap: wrap; gap: 2rem; justify-content: center; margin-top: 2rem; }
-        .match-card { border: 1px solid #ddd; border-radius: 10px; padding: 1rem 2rem; background: #fff; box-shadow: 0 2px 8px #eee; display: flex; align-items: center; cursor: pointer; transition: box-shadow 0.2s; }
-        .match-card:hover { box-shadow: 0 4px 16px #ccc; }
-        .match-time { font-size: 0.95rem; color: #666; margin-left: 1rem; }
+        .match-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .match-card {
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 1rem 2rem;
+            background: #fff;
+            box-shadow: 0 2px 8px #eee;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: box-shadow 0.2s;
+        }
+
+        .match-card:hover {
+            box-shadow: 0 4px 16px #ccc;
+        }
+
+        .match-time {
+            font-size: 0.95rem;
+            color: #666;
+            margin-left: 1rem;
+        }
 
         @media (max-width: 600px) {
             .match-list-item {
@@ -123,10 +149,12 @@
                 max-width: 98vw;
                 padding: 18px 6vw;
             }
+
             .teams {
                 font-size: 1.1rem;
                 gap: 10px;
             }
+
             .team-logo {
                 width: 36px;
                 height: 36px;
@@ -134,24 +162,24 @@
         }
     </style>
 </head>
+
 <body>
     <div class="select-container">
         <img src="{{ url_for('static', filename='images/logo.png') }}" class="logo" />
         <h1>Select a Match</h1>
         <div class="matches-list">
             {% for match in matches %}
-                <div class="match-list-item" onclick="selectMatch({{ match.fixture_id }})">
-                    <div class="teams">
-                        <img src="{{ match.team1_logo_url }}" class="team-logo" alt="{{ match.team1_name }}">
-                        <span class="team-name">{{ match.team1_name }}</span>
-                        <span class="vs">vs</span>
-                        <span class="team-name">{{ match.team2_name }}</span>
-                        <img src="{{ match.team2_logo_url }}" class="team-logo" alt="{{ match.team2_name }}">
-                    </div>
-                    <div class="match-info">
-                        <span class="match-time">{{ match.date }}</span>
-                    </div>
+            <div class="match-list-item" onclick="selectMatch({{ match.fixture_id }})">
+                <div class="teams">
+                    <img src="{{ match.team1.logo_url }}" class="team-logo" />
+                    <span class="team-name">{{ match.team1.name }}</span>
+                    <span class="vs-text">vs</span>
+                    <img src="{{ match.team2.logo_url }}" class="team-logo" />
+                    <span class="team-name">{{ match.team2.name }}</span>
                 </div>
+                <div class="match-date">{{ match.starting_at }}</div>
+            </div>
+
             {% endfor %}
         </div>
     </div>
@@ -220,4 +248,5 @@
         fetchTop3Predictions();
     </script>
 </body>
-</html> 
+
+</html>
