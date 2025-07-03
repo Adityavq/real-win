@@ -741,7 +741,7 @@ def update_winner_results():
 if __name__ == "__main__":
     # with app.app_context():
     #     run_and_store_all_today_predictions()
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        with app.app_context():
-            run_and_store_all_today_predictions()
+    # if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        # with app.app_context():
+            # run_and_store_all_today_predictions()
     app.run(debug=True,host='0.0.0.0',port=5000)
