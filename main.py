@@ -447,7 +447,6 @@ def run_and_store_all_today_predictions():
         predictions = []
         league_cache = {}
         notes = "Automated prediction for all matches of the day."
-        matches = matches[:4]
         for match in matches:
             fixture_id = match.get("id")
             starting_at = match.get("starting_at")
