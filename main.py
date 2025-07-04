@@ -672,8 +672,7 @@ def get_predictions_list():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route("/api/update_winner_results", methods=["POST"])
-def update_winner_results():
+def update_winner_results_internal():
     try:
         today = datetime.now().date()
         yesterday = today - timedelta(days=1)
@@ -681,7 +680,7 @@ def update_winner_results():
         conn = db_connection()
         cur = conn.cursor()
 
-        # Get top 5 predictions from yesterday, fallback to today
+        # Get top 5 predictions
         cur.execute("""
             SELECT match_id
             FROM predictions
@@ -706,7 +705,6 @@ def update_winner_results():
         conn.close()
 
         for match_id in match_ids:
-            # Step 1: Fetch actual result from API
             url = f"https://api.sportmonks.com/v3/football/fixtures/{match_id}"
             params = {"api_token": API_TOKEN}
             response = requests.get(url, params=params)
@@ -717,19 +715,16 @@ def update_winner_results():
             data = response.json().get("data", {})
             result_info = (data.get("result_info") or "").lower()
 
-            # Step 2: Get prediction from DB
             prediction = Prediction.query.filter_by(match_id=match_id).first()
             if not prediction:
                 continue
 
-            # Step 3: Parse predicted winner from JSON
             try:
                 data_points = json.loads(prediction.data_points)
                 predicted_winner = data_points.get("predicted_winner", "").lower()
             except Exception:
                 predicted_winner = ""
 
-            # Step 4: Determine actual result
             if "draw" in result_info:
                 winner_result = "draw"
             elif predicted_winner and predicted_winner in result_info:
@@ -737,22 +732,24 @@ def update_winner_results():
             else:
                 winner_result = "lost"
 
-            # Step 5: Save to DB
             prediction.winner_result = winner_result
             db.session.add(prediction)
 
         db.session.commit()
-
-        return jsonify({"message": "Winner results updated successfully."}), 200
+        return True, "Updated"
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-    
+        return False, str(e)
+
 
 @app.route("/api/success_rate_result", methods=["GET"])
 def success_rate_result():
     try:
+        success, message = update_winner_results_internal()
+        if not success:
+            return jsonify({"error": f"Update failed: {message}"}), 500
+        
         last_10_predictions = Prediction.query.order_by(Prediction.id.desc()).limit(10).all()
         won_in_last_10 = sum(1 for p in last_10_predictions if p.winner_result == "won")
         success_rate = (won_in_last_10 / 10) * 100 if last_10_predictions else 0

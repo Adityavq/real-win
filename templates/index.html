@@ -22,7 +22,7 @@
     </header>
     <main>
         <div class="container">
-            <div class="main-top">
+            <section class="recent prediction_outer">
                 <section class="prediction-box">
                     <h2>Today's Prediction</h2>
                     <div class="match-info">
@@ -39,9 +39,10 @@
                     <div class="prediction">Prediction <span>{{ parsed_gpt.predicted_winner }} TO WIN</span></div>
                     <div class="time">{{ parsed_gpt.kickoff_time }}</div>
                 </section>
-
-                <section class="performance-box">
-                    <h2>Performance</h2>
+            </section>
+            <div class="main-top sec_changes">
+            
+                <section class="recent">
                     <div class="performance-detail">
                         <p><strong>Fixture:</strong> {{ parsed_gpt.fixture }}</p>
                         <p><strong>Confidence Level:</strong> {{ parsed_gpt.confidence_level }}</p>
@@ -51,9 +52,23 @@
                         <p><strong>Win Probability:</strong> {{ parsed_gpt.win_probability }}%</p>
                         <p><strong>Kickoff Time:</strong> {{ parsed_gpt.kickoff_time }}</p>
                     </div>
+                   </section>
 
+                <section class="performance-box">
+                    <h2>Performance</h2>
+                    <!-- ======= Pie Chart Section ======= -->
+                    <div class="chart-container">
+                        <canvas id="winProbabilityChart" width="300" height="300"></canvas>
+                        <div class="center-text">
+                            <div class="success-rate-label">SUCCESS RATE</div>
+                            <div class="percentage" id="percentageText">0%</div>
+                        </div>
+                    </div>
+                    <!-- Chart.js CDN -->
+                    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
                 </section>
             </div>
+           
 
             <section class="recent">
                 <h2>Recent Predictions</h2>
@@ -78,34 +93,63 @@
         </div>
     </main>
 
-    <!-- <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            fetch("/api/last_predictions")
-                .then(response => response.json())
-                .then(data => {
-                    const tbody = document.getElementById("predictionTableBody");
-                    tbody.innerHTML = ""; // Clear previous data
+    <script>
 
-                    data.forEach(pred => {
-                        const row = document.createElement("tr");
+        async function renderSuccessRateChart() {
+            try {
+                const res = await fetch('/api/success_rate_result');
+                const data = await res.json();
 
-                        row.innerHTML = `
-                            <td>${pred.team1}</td>
-                            <td>${pred.team2}</td>
-                            <td>${pred.prediction}</td>
-                            <td class="${pred.result.toLowerCase()}">${pred.result}</td>
-                            <td>${pred.date}</td>
-                            `;
+                const successRateStr = data.success_rate || "0%";
+                const successRate = parseInt(successRateStr.replace('%', '')) || 0;
+                const failRate = 100 - successRate;
 
-                        tbody.appendChild(row);
-                    });
-                })
-                .catch(err => {
-                    console.error("Error loading predictions:", err);
+                // Update center text
+                document.getElementById('percentageText').innerText = `${successRate}%`;
+
+                const ctx = document.getElementById('winProbabilityChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Win', 'Other Outcome'],
+                        datasets: [{
+                            data: [successRate, failRate],
+                            backgroundColor: ['#ccff00', '#F44336'],
+                            borderWidth: 0,
+                            cutout: '85%'
+                        }]
+                    },
+                    options: {
+                        responsive: false,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        return context.label + ': ' + context.parsed + '%';
+                                    }
+                                }
+                            }
+                        },
+                        elements: {
+                            arc: {
+                                borderWidth: 0
+                            }
+                        }
+                    }
                 });
-        });
+            } catch (error) {
+                console.error('Failed to load success rate:', error);
+            }
+        }
 
-    </script> -->
+        // Run it on page load
+        window.addEventListener('DOMContentLoaded', renderSuccessRateChart);
+
+    </script>
 
     <script src="/static/js/index.js"></script>
 </body>
