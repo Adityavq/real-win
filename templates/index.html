@@ -13,9 +13,9 @@
         <div class="container">
             <div class="header-inner">
                 <div class="logo_outer">
-                     <img src="/static/images/logo.png" class="logo" alt="">
+                    <img src="/static/images/logo.png" class="logo" alt="">
                 </div>
-               
+
                 <a href="/logout" class="logout">Logout</a>
             </div>
         </div>
@@ -51,59 +51,63 @@
                         <p><strong>Win Probability:</strong> {{ parsed_gpt.win_probability }}%</p>
                         <p><strong>Kickoff Time:</strong> {{ parsed_gpt.kickoff_time }}</p>
                     </div>
+
                 </section>
             </div>
 
             <section class="recent">
                 <h2>Recent Predictions</h2>
                 <div class="table_outer">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Match</th>
-                            <th>Match</th>
-                            <th>Prediction</th>
-                            <th>Result</th>
-                            <th>Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Villarreal</td>
-                            <td>Barcelona</td>
-                            <td>BARCELONA TO WIN</td>
-                            <td class="won">WON</td>
-                            <td>23 Apr 2024</td>
-                        </tr>
-                        <tr>
-                            <td>Real Madrid</td>
-                            <td>Sevilla</td>
-                            <td>REAL MADRID TO WIN</td>
-                            <td class="won">WON</td>
-                            <td>22 Apr 2024</td>
-                        </tr>
-                        <tr>
-                            <td>Everton</td>
-                            <td>Liverpool</td>
-                            <td>LIVERPOOL TO WIN</td>
-                            <td class="lost">LOST</td>
-                            <td>21 Apr 2024</td>
-                        </tr>
-                        <tr>
-                            <td>Napoli</td>
-                            <td>Milan</td>
-                            <td>NAPOLI TO WIN</td>
-                            <td class="won">WON</td>
-                            <td>20 Apr 2024</td>
-                        </tr>
-                    </tbody>
-                </table>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Match</th>
+                                <th>Match</th>
+                                <th>Prediction</th>
+                                <th>Result</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="predictionTableBody">
+                            <!-- Rows will be injected here -->
+                        </tbody>
+                    </table>
                 </div>
             </section>
+
         </div>
     </main>
 
-    <script src="static/js/custom.js"></script>
+    <!-- <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            fetch("/api/last_predictions")
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById("predictionTableBody");
+                    tbody.innerHTML = ""; // Clear previous data
+
+                    data.forEach(pred => {
+                        const row = document.createElement("tr");
+
+                        row.innerHTML = `
+                            <td>${pred.team1}</td>
+                            <td>${pred.team2}</td>
+                            <td>${pred.prediction}</td>
+                            <td class="${pred.result.toLowerCase()}">${pred.result}</td>
+                            <td>${pred.date}</td>
+                            `;
+
+                        tbody.appendChild(row);
+                    });
+                })
+                .catch(err => {
+                    console.error("Error loading predictions:", err);
+                });
+        });
+
+    </script> -->
+
+    <script src="/static/js/index.js"></script>
 </body>
 
 </html>

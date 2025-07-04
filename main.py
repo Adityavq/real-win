@@ -6,6 +6,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
 import config
 import os
+import json
+import ast
 from flask_migrate import upgrade
 from flask import redirect, url_for
 from functools import wraps
@@ -43,7 +45,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-@app.route('/')
+@app.route('/signup_user')
 def signup_page():
     return render_template('signup.html')
 
@@ -51,7 +53,15 @@ def signup_page():
 def sigin_page():
     return render_template('login.html')
 
-import json
+@app.route('/')
+def ai_sports_page():
+    return render_template('ai-sports.html')
+
+@app.route('/select_sports')
+@login_required
+def select_sports_page():
+    return render_template('select-sport.html')
+
 @app.route('/select-match')
 @login_required
 def select_match_page():
@@ -70,12 +80,12 @@ def select_match_page():
 
             try:
                 # Parse GPT JSON safely
-                gpt_data = json.loads(pred.data_points.replace("'", "\""))
+                # gpt_data = json.loads(pred.data_points.replace("'", "\""))
+                gpt_data = ast.literal_eval(pred.data_points)
                 fixture = gpt_data.get("fixture", "Unknown Fixture")
                 predicted_winner = gpt_data.get("predicted_winner")
                 explanation = gpt_data.get("explanation", "No prediction")
                 kickoff_time_str = gpt_data.get("kickoff_time")
-
                 # Format kickoff time
                 kickoff_time = "N/A"
                 if kickoff_time_str:
@@ -91,7 +101,6 @@ def select_match_page():
             except Exception as e:
                 print(f"Error parsing GPT data: {e}")
                 continue
-
             if len(result) == 3:
                 break
 
@@ -106,15 +115,13 @@ def select_match_page():
 @login_required
 def home_page(fixture_id):
     try:
-    
-        # Get prediction for fixture
         prediction = Prediction.query.filter_by(match_id=fixture_id).first()
         if not prediction:
             return redirect(url_for('select_match_page'))
 
-        # Parse GPT response safely
+        # Parse GPT response safely (no replacement!)
         try:
-            gpt_data = json.loads(prediction.data_points.replace("'", "\""))
+            gpt_data = json.loads(prediction.data_points)
         except Exception as e:
             gpt_data = {}
             print(f"Error parsing GPT data: {e}")
@@ -150,7 +157,7 @@ def home_page(fixture_id):
             teams=team_logos)
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500  
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/logout')
@@ -223,7 +230,7 @@ def login():
             hashed_password = result[0]
             if check_password_hash(hashed_password, password):
                 session['user_email'] = email 
-                return jsonify({'message': 'Login successful', 'redirect': url_for('select_match_page')}), 200
+                return jsonify({'message': 'Login successful', 'redirect': url_for('select_sports_page')}), 200
             else:
                 return jsonify({'error': 'Invalid Authentication'}), 401
         else:
@@ -603,17 +610,15 @@ def prediction_details(fixture_id):
 def match_details_page(fixture_id):
     return render_template('index.html')
 
-@app.route("/api/last_predections", methods=["GET"])
+@app.route("/api/last_predictions", methods=["GET"])
 def get_predictions_list():
     try:
         conn = db_connection()
         cur = conn.cursor()
 
-        # Calculate yesterday and today
         today = datetime.now().date()
         yesterday = today - timedelta(days=1)
 
-        # Try fetching from yesterday first
         cur.execute("""
             SELECT id, match_id, confidence, predicted_winner_id, winner_result, data_points, created_at
             FROM predictions
@@ -623,7 +628,6 @@ def get_predictions_list():
         """, (yesterday,))
         rows = cur.fetchall()
 
-        # If no predictions found for yesterday, fallback to today
         if not rows:
             cur.execute("""
                 SELECT id, match_id, confidence, predicted_winner_id, winner_result, data_points, created_at
@@ -638,23 +642,35 @@ def get_predictions_list():
         conn.close()
 
         predictions = []
+
         for row in rows:
+            try:
+                dp = json.loads(row[5])
+                fixture = dp.get("fixture", "")
+                team1, team2 = fixture.split(" vs ")
+                predicted_winner = dp.get("predicted_winner", "")
+                kickoff_time = dp.get("kickoff_time", "")
+                kickoff_date = (
+                    datetime.strptime(kickoff_time, "%Y-%m-%d %H:%M:%S %Z").strftime("%d %b %Y")
+                    if kickoff_time else None
+                )
+            except Exception as e:
+                # fallback if data is malformed
+                team1, team2, predicted_winner, kickoff_date = "?", "?", "?", "?"
+
             predictions.append({
-                'id': row[0],
-                'match_id': row[1],
-                'confidence': float(row[2]),
-                'predicted_winner_id': row[3],
-                'winner_result': row[4],
-                'data_points': row[5],
-                'created_at': row[6].strftime('%Y-%m-%d %H:%M:%S') if row[6] else None
+                "team1": team1,
+                "team2": team2,
+                "prediction": f"{predicted_winner.upper()} TO WIN",
+                "result": row[4].upper() if row[4] else "UNPLAYED",
+                "date": kickoff_date,
+                "raw_gpt_response": dp
             })
 
         return jsonify(predictions), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
-
 
 @app.route("/api/update_winner_results", methods=["POST"])
 def update_winner_results():
@@ -689,9 +705,8 @@ def update_winner_results():
         cur.close()
         conn.close()
 
-        won_count = 0
-
         for match_id in match_ids:
+            # Step 1: Fetch actual result from API
             url = f"https://api.sportmonks.com/v3/football/fixtures/{match_id}"
             params = {"api_token": API_TOKEN}
             response = requests.get(url, params=params)
@@ -702,46 +717,61 @@ def update_winner_results():
             data = response.json().get("data", {})
             result_info = (data.get("result_info") or "").lower()
 
+            # Step 2: Get prediction from DB
+            prediction = Prediction.query.filter_by(match_id=match_id).first()
+            if not prediction:
+                continue
+
+            # Step 3: Parse predicted winner from JSON
+            try:
+                data_points = json.loads(prediction.data_points)
+                predicted_winner = data_points.get("predicted_winner", "").lower()
+            except Exception:
+                predicted_winner = ""
+
+            # Step 4: Determine actual result
             if "draw" in result_info:
                 winner_result = "draw"
-            elif "won" in result_info:
+            elif predicted_winner and predicted_winner in result_info:
                 winner_result = "won"
-            elif "loss" in result_info or "lost" in result_info:
-                winner_result = "lost"
             else:
-                winner_result = "unplayed"
+                winner_result = "lost"
 
-            # Count number of "won"
-            if winner_result == "won":
-                won_count += 1
-
-            # Update DB
-            prediction = Prediction.query.filter_by(match_id=match_id).first()
-            if prediction:
-                prediction.winner_result = winner_result
-                db.session.add(prediction)
+            # Step 5: Save to DB
+            prediction.winner_result = winner_result
+            db.session.add(prediction)
 
         db.session.commit()
 
-        total = len(match_ids)
-        success_rate = (won_count / total) * 100 if total > 0 else 0
-
-        return jsonify({
-            "message": "Winner results updated successfully.",
-            "success_rate": f"{int(success_rate)}%",
-            "total": total,
-            "won": won_count
-        }), 200
+        return jsonify({"message": "Winner results updated successfully."}), 200
 
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+    
+
+@app.route("/api/success_rate_result", methods=["GET"])
+def success_rate_result():
+    try:
+        last_10_predictions = Prediction.query.order_by(Prediction.id.desc()).limit(10).all()
+        won_in_last_10 = sum(1 for p in last_10_predictions if p.winner_result == "won")
+        success_rate = (won_in_last_10 / 10) * 100 if last_10_predictions else 0
+
+        # Step 4: Get total "won" predictions so far (strike count)
+        total_won = Prediction.query.filter_by(winner_result="won").count()
+        return jsonify({
+            "success_rate": f"{round(success_rate)}%",
+            "won": won_in_last_10,
+            "total": total_won
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 
 if __name__ == "__main__":
-    # with app.app_context():
-    #     run_and_store_all_today_predictions()
     # if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        # with app.app_context():
-            # run_and_store_all_today_predictions()
+    #     with app.app_context():
+    #         run_and_store_all_today_predictions()
     app.run(debug=True,host='0.0.0.0',port=5000)

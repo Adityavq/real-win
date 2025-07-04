@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Sports Tips</title>
+    <!-- <link href="style.css" rel="stylesheet" type="text/css"> -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sports.css') }}">
+</head>
+
+<body>
+    <div class="page_outer">
+        <div class="page_inner">
+            <section class="header_outer">
+                <div class="custom_continer">
+                    <div class="nav">
+                        <div class="logo">🧠 AI Tips</div>
+                        <a href="#" class="cta">Get Started</a>
+                    </div>
+                </div>
+            </section>
+            <div class="section how_it_work choose_sport">
+                <div class="section_head">
+                    <h2>Choose a Game</h2>
+                </div>
+                <div class="custom_continer two_col_outer">
+                    <div class="game_box">
+                        <div class="sport_icon">
+                            <a href="#" class="box_link"> <img src="/static/images/cricket-image.png" alt="Game"></a>
+                        </div>
+                        <h3><a href="#" class="box_link">Cricket</a></h3>
+                    </div>
+                    <div class="game_box">
+                        <div class="sport_icon">
+                            <a href="/select-match" class="box_link"> <img src="/static/images/football-image.png" alt="Game"></a>
+                        </div>
+                        <h3><a href="/select-match" class="box_link">Football</a></h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

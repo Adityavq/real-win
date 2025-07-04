@@ -1,0 +1,245 @@
+ * {
+     margin: 0;
+     padding: 0;
+     box-sizing: border-box;
+ }
+
+ body {
+     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+ }
+
+ .page_outer {
+     background: #080814;
+     color: #fff;
+     min-height: 100vh;
+     padding: 30px
+ }
+
+ .nav {
+     display: flex;
+     justify-content: space-between;
+     align-items: center;
+     margin-bottom: 20px;
+ }
+
+ .logo {
+     font-size: 1.2rem;
+     font-weight: bold;
+     color: #fff;
+ }
+
+ .page_outer p {
+     font-size: 16px;
+     line-height: 24px;
+     margin: 0 0 10px;
+ }
+
+ .custom_continer.bg_style {
+     display: flex;
+     align-items: center;
+     gap: 50px;
+ }
+
+ .page_outer p:last-child {
+     margin: 0;
+ }
+
+ .hero_content {
+     width: 60%;
+ }
+
+ .hero_icons {
+     width: 40%;
+ }
+
+ .hero_icons img {
+     max-width: 100%;
+ }
+
+ .header_outer .cta {
+     background-color: #0f0d1f;
+     color: #fff;
+     padding: 10px 20px;
+     border-radius: 8px;
+     font-weight: 600;
+     text-decoration: none;
+     font-size: 16px
+ }
+
+ .hero_icons img {
+     max-width: 100%;
+ }
+
+ .cta:hover {
+     background-color: #aaff00;
+     color: #000;
+ }
+.page_outer img{
+    max-width: 100%;
+}
+ .hero_banner .bg_style {
+     background: #0f0d1f;
+     padding: 30px 30px 0;
+     width: 100%;
+     border-radius: 15px;
+ }
+
+ .two_col_outer {
+     display: grid;
+     grid-template-columns: repeat(2, 1fr);
+     gap: 20px;
+ }
+.section.how_it_work.choose_sport {
+	padding-top: 50px;
+}
+ .left_col,
+ .right_col {
+     display: flex;
+     flex-direction: column;
+     background: #0f0d1f;
+     padding: 30px;
+     border-radius: 15px;
+     width: 100%;
+ }
+.choose_sport a {
+	text-decoration: none;
+	text-align: center;
+	display: flex;
+	flex-direction: column;
+	gap: 15px;
+}
+.choose_sport .section_head h2 {
+	font-size: 34px;
+	color: #aaff00;
+}
+
+.choose_sport .custom_continer h3 a{
+	font-size: 26px;
+	color: #fff;
+}
+ .custom_continer {
+     margin: 0 auto 30px;
+     max-width: 900px;
+ }
+.sport_icon {
+	background: #0f0d1f;
+	padding: 30px;
+	border-radius: 15px;
+    margin-bottom: 15px;
+}
+.sport_icon:hover{
+    box-shadow: 0 0 20px rgba(170, 255, 0, 0.1);
+}
+ .hero_banner h1 {
+     font-size: 1.8rem;
+     margin-bottom: 1rem;
+     line-height: 1.4;
+     color: #fff;
+ }
+
+ .header_outer .custom_continer {
+     background: transparent;
+     padding: 0 30px;
+ }
+
+ .hero_banner .button {
+     background-color: #aaff00;
+     color: #000;
+     padding: 0.7rem 1.2rem;
+     border-radius: 8px;
+     display: inline-block;
+     margin: 1rem 0;
+     text-align: center;
+     font-weight: bold;
+     text-decoration: none;
+ }
+
+ .hero_banner .button:hover {
+     background-color: #cfff00;
+ }
+
+
+ .section h3 {
+     font-size: 1.2rem;
+     margin-bottom: 0.5rem;
+     color: #aaff00;
+ }
+
+ .proof_col h4 {
+     font-size: 44px;
+     margin: 0 0 10px;
+ }
+
+ .how_it_work_text img {
+     max-width: 30px;
+ }
+
+ .text_icons {
+     background: #fff;
+     padding: 10px;
+     width: 45px;
+     height: 45px;
+     border-radius: 100px;
+     display: flex;
+     justify-content: center;
+     align-items: center;
+     padding: 5px;
+ }
+.section_head {
+	max-width: 900px;
+	margin: 0 auto 20px;
+	text-align: center;
+}
+ .left_col.how_it_work_text p {
+     display: flex;
+     align-items: center;
+     gap: 15px;
+     font-size: 18px;
+ }
+
+ @media screen and (max-width:767px) {
+     .two_col_outer {
+         grid-template-columns: repeat(1, 1fr);
+     }
+
+     .hero_icons {
+         order: 1;
+     }
+
+     .hero_content {
+         order: 2;
+     }
+
+     .left_col,
+     .right_col,
+     .hero_banner .bg_style {
+         padding: 20px 15px;
+     }
+
+     .header_outer .custom_continer {
+         background: transparent;
+         padding: 0;
+     }
+
+     .hero_banner h1 {
+         font-size: 1.4rem;
+         margin-bottom: 0;
+     }
+
+     .page_outer {
+         padding: 15px;
+     }
+
+     .custom_continer.bg_style {
+         flex-wrap: wrap;
+
+     }
+
+     .hero_icons {
+         width: 100%;
+     }
+
+     .hero_content {
+         width: 100%;
+     }
+ }

@@ -64,24 +64,22 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            fetch("/api/update_winner_results", {
-                method: "POST"
+            fetch("/api/success_rate_result", {
+                method: "GET"
             })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success_rate) {
                         document.getElementById("successRate").textContent = data.success_rate;
                     }
-                    // Optional: if API returns win streak later
-                    // if (data.win_streak) {
-                    //     document.getElementById("winStreak").textContent = data.win_streak;
-                    // }
+                    if (data.won !== undefined) {
+                        document.getElementById("winStreak").textContent = data.won;
+                    }
                 })
                 .catch(error => {
                     console.error("Error fetching stats:", error);
                 });
         });
-
 
         document.addEventListener('DOMContentLoaded', function () {
             const boxes = document.querySelectorAll('.fixture-box');
