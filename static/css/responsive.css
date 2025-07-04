@@ -141,3 +141,28 @@ div#predictions-wrapper {
   flex-direction: column;
   gap: 15px;
 }
+
+
+@media (max-width: 767px) {
+  .logo_outer img {
+    max-width: 280px;
+}
+.logo_outer {
+  text-align: center;
+}
+.prediction span {
+  font-size: 16px;
+}
+.prediction .time {
+  font-size: 16px;
+}
+.prediction-box h2, .statics_box h2 {
+  font-size: 25px;
+}
+.success_rate_box h2 {
+  font-size: 36px;
+}
+section.statics_box {
+  margin-top: 10px;
+}
+}

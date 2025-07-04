@@ -206,5 +206,20 @@ a {
     gap: 20px;
     flex-direction: column;
   }
+ 
+  .table_outer th, .table_outer  td {
+    padding: 10px 2px;
+    font-size: 14px;
+  }
+  .performance-detail {
+    font-size: 15px;
 }
+  section.recent table {
+    min-width: 617px;
+    table-layout: fixed;
+  }
+}
+
+
+ 
 /* = */
