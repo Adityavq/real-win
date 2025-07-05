@@ -749,7 +749,7 @@ def success_rate_result():
         if not success:
             return jsonify({"error": f"Update failed: {message}"}), 500
         
-        last_10_predictions = Prediction.query.order_by(Prediction.id.desc()).limit(10).all()
+        last_10_predictions = Prediction.query.order_by(Prediction.id.desc()).all()
         won_in_last_10 = sum(1 for p in last_10_predictions if p.winner_result == "won")
         success_rate = (won_in_last_10 / 10) * 100 if last_10_predictions else 0
 
