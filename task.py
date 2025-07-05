@@ -39,77 +39,84 @@ def run_and_store_all_today_predictions():
         league_cache = {}
         notes = "Automated prediction for all matches of the day."
 
-        for match in matches[:6]:
-            fixture_id = match.get("id")
-            starting_at = match.get("starting_at")
-            if not fixture_id or not starting_at:
-                continue
-
-            participant_data = get_participant_team_ids(fixture_id)
-            if not participant_data:
-                continue
-
-            team_id_A = participant_data["team_a_id"]
-            team_id_B = participant_data["team_b_id"]
-
-            team_a = session.query(Team).filter_by(id=team_id_A).first()
-            if not team_a:
-                team_a_name = f"Team {team_id_A}"
-                team_a_logo = get_team_logo(team_a_name)
-                team_a = Team(id=team_id_A, name=team_a_name, logo_url=team_a_logo)
-                session.add(team_a)
-
-            team_b = session.query(Team).filter_by(id=team_id_B).first()
-            if not team_b:
-                team_b_name = f"Team {team_id_B}"
-                team_b_logo = get_team_logo(team_b_name)
-                team_b = Team(id=team_id_B, name=team_b_name, logo_url=team_b_logo)
-                session.add(team_b)
-
-            session.flush()
-
-            match_obj = session.query(Match).filter_by(id=fixture_id).first()
-            if not match_obj:
-                match_obj = Match(id=fixture_id, team1_id=team_id_A, team2_id=team_id_B, date=today)
-                session.add(match_obj)
-
-            session.flush()
-
+        for match in matches:
             try:
-                match_date = datetime.strptime(starting_at, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y")
-            except Exception:
-                match_date = starting_at
+                fixture_id = match.get("id")
+                starting_at = match.get("starting_at")
+                if not fixture_id or not starting_at:
+                    continue
 
-            prediction_str = gpt_chatbot(team_id_A, team_id_B, match_date, notes, league_cache)
-            prediction_data = parse_gpt_prediction(prediction_str)
+                participant_data = get_participant_team_ids(fixture_id)
+                if not participant_data:
+                    continue
 
-            predicted_winner_name = prediction_data.get("predicted_winner")
-            predicted_winner = session.query(Team).filter_by(name=predicted_winner_name).first()
-            if not predicted_winner:
-                predicted_winner_logo = get_team_logo(predicted_winner_name)
-                predicted_winner = Team(name=predicted_winner_name, logo_url=predicted_winner_logo)
-                session.add(predicted_winner)
+                team_id_A = participant_data["team_a_id"]
+                team_id_B = participant_data["team_b_id"]
 
-            session.flush()
+                team_a = session.query(Team).filter_by(id=team_id_A).first()
+                if not team_a:
+                    team_a_name = f"Team {team_id_A}"
+                    team_a_logo = get_team_logo(team_a_name)
+                    team_a = Team(id=team_id_A, name=team_a_name, logo_url=team_a_logo)
+                    session.add(team_a)
 
-            confidence = float(prediction_data.get("win_probability", 0))
-            pred = Prediction(
-                match_id=fixture_id,
-                confidence=confidence,
-                predicted_winner_id=predicted_winner.id,
-                data_points=prediction_str,
-                created_at=datetime.utcnow()
-            )
-            session.add(pred)
-            session.flush()
+                team_b = session.query(Team).filter_by(id=team_id_B).first()
+                if not team_b:
+                    team_b_name = f"Team {team_id_B}"
+                    team_b_logo = get_team_logo(team_b_name)
+                    team_b = Team(id=team_id_B, name=team_b_name, logo_url=team_b_logo)
+                    session.add(team_b)
 
-            prediction_data.update({
-                "fixture_id": fixture_id,
-                "starting_at": starting_at,
-                "raw_gpt_response": prediction_str,
-                "db_prediction_id": pred.id
-            })
-            predictions.append(prediction_data)
+                session.flush()
+
+                match_obj = session.query(Match).filter_by(id=fixture_id).first()
+                if not match_obj:
+                    match_obj = Match(id=fixture_id, team1_id=team_id_A, team2_id=team_id_B, date=today)
+                    session.add(match_obj)
+
+                session.flush()
+
+                try:
+                    match_date = datetime.strptime(starting_at, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y")
+                except Exception:
+                    match_date = starting_at
+
+                prediction_str = gpt_chatbot(team_id_A, team_id_B, match_date, notes, league_cache)
+                prediction_data = parse_gpt_prediction(prediction_str)
+
+                predicted_winner_name = prediction_data.get("predicted_winner")
+                predicted_winner = session.query(Team).filter_by(name=predicted_winner_name).first()
+                if not predicted_winner:
+                    predicted_winner_logo = get_team_logo(predicted_winner_name)
+                    predicted_winner = Team(name=predicted_winner_name, logo_url=predicted_winner_logo)
+                    session.add(predicted_winner)
+
+                session.flush()
+
+                confidence = float(prediction_data.get("win_probability", 0))
+                pred = Prediction(
+                    match_id=fixture_id,
+                    confidence=confidence,
+                    predicted_winner_id=predicted_winner.id,
+                    data_points=prediction_str,
+                    created_at=datetime.utcnow()
+                )
+                session.add(pred)
+                session.flush()
+
+                prediction_data.update({
+                    "fixture_id": fixture_id,
+                    "starting_at": starting_at,
+                    "raw_gpt_response": prediction_str,
+                    "db_prediction_id": pred.id
+                })
+
+                predictions.append(prediction_data)
+                session.commit()
+                print(f"✅ Saved prediction for fixture {fixture_id}")
+            except Exception as match_error:
+                session.rollback()
+                print(f"❌ Error processing fixture {match.get('id')}: {match_error}")
 
         # Remove existing top predictions for today
         today_date = datetime.now().date()
