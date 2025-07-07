@@ -111,7 +111,7 @@ def get_team_details_with_last_five_matches(team_id, league_cache):
                     "league_id": league_id,
                     "league_name": league_name,
                     "leg": fixture.get("leg"),
-                     "team_position": team_position
+                    "team_position": team_position
                 })
     latest_position = None
     if last_five_matches:
@@ -211,7 +211,7 @@ def gpt_chatbot(team_id_A, team_id_B, match_date, notes, league_cache):
     else:
         head_to_head = "N/A"
 
-    injuries = "N/A"      # You can fetch and format if you have this data
+    injuries = "None"      # You can fetch and format if you have this data
     standings = f"Team A standing : {team_A_position} and Team B standing : {team_B_position}"     # You can fetch and format if you have this data
 
     # Print all stats for debugging
@@ -230,7 +230,11 @@ def gpt_chatbot(team_id_A, team_id_B, match_date, notes, league_cache):
     print("========================================\n")
 
     final_prompt = f'''
-You are an expert AI sports analyst. Based on the structured data provided below, return a single JSON object with your most confident football betting prediction for today’s matches. Be accurate and concise. Use the following format:
+You are an expert AI sports analyst. Based on the structured data provided below, return a single JSON object with your most confident football betting prediction for today’s matches.
+Use all available datapoints to support your decision, including team form, standings, player information, venue, head-to-head stats, win probability, and any other relevant indicators.
+Be highly accurate and analytical. Provide a strong, detailed explanation grounded in the data, highlighting why this prediction is your best pick for today.
+Be accurate and concise use all datapoints that i am giving and give a good detailed explanation too. Use the following format:
+
 
 {{
   "fixture": "<team_a> vs <team_b>",

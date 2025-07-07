@@ -345,3 +345,25 @@ section.recent.prediction_outer h2 {
  
 }
 
+/* explanation css */
+
+.explanation-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.explanation-text.short {
+  -webkit-line-clamp: 1; /* show only 3 lines */
+}
+
+.toggle-btn {
+  background: none;
+  color: #007bff;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.9rem;
+  text-decoration: underline;
+}
+

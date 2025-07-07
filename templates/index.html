@@ -43,18 +43,24 @@
                 </section>
             </section>
             <div class="main-top sec_changes">
-            
+
                 <section class="recent">
                     <div class="performance-detail">
                         <p><strong>Fixture:</strong> {{ parsed_gpt.fixture }}</p>
                         <p><strong>Confidence Level:</strong> {{ parsed_gpt.confidence_level }}</p>
                         <p><strong>Explanation:</strong></p>
-                        <p>{{ parsed_gpt.explanation }}</p>
+                        <!-- <p>{{ parsed_gpt.explanation }}</p> -->
+                        <p>
+                            <span class="explanation-text short">
+                                {{ parsed_gpt.explanation }}
+                            </span>
+                            <button class="toggle-btn" onclick="toggleExplanation(this)">Show More</button>
+                        </p>
                         <p><strong>Predicted Winner:</strong> {{ parsed_gpt.predicted_winner }}</p>
                         <p><strong>Win Probability:</strong> {{ parsed_gpt.win_probability }}%</p>
                         <p><strong>Kickoff Time:</strong> {{ parsed_gpt.kickoff_time }}</p>
                     </div>
-                   </section>
+                </section>
 
                 <section class="performance-box">
                     <h2>Performance</h2>
@@ -70,7 +76,7 @@
                     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
                 </section>
             </div>
-           
+
 
             <section class="recent">
                 <h2>Recent Predictions</h2>
@@ -96,6 +102,19 @@
     </main>
 
     <script>
+
+        function toggleExplanation(button) {
+            const text = button.previousElementSibling;
+            const isShort = text.classList.contains('short');
+
+            if (isShort) {
+                text.classList.remove('short');
+                button.textContent = "Show Less";
+            } else {
+                text.classList.add('short');
+                button.textContent = "Show More";
+            }
+        }
 
         async function renderSuccessRateChart() {
             try {

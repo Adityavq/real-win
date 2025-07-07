@@ -742,6 +742,59 @@ def update_winner_results_internal():
         return False, str(e) 
 
 
+# @app.route("/api/success_rate_result", methods=["GET"])
+# def success_rate_result():
+#     try:
+#         # Step 1: Update winner results
+#         success, message = update_winner_results_internal()
+#         if not success:
+#             return jsonify({"error": f"Update failed: {message}"}), 500
+
+#         # Step 2: Calculate overall success rate from ALL predictions
+#         all_predictions = Prediction.query.order_by(Prediction.id.desc()).all()
+#         total_entries = len(all_predictions)
+
+#         if total_entries == 0:
+#             return jsonify({
+#                 "success_rate": "0%",
+#                 "won": 0,
+#                 "total": 0,
+#                 "streak": 0
+#             }), 200
+
+#         total_won = sum(1 for p in all_predictions if p.winner_result == "won")
+#         success_rate = round((total_won / total_entries) * 100)
+
+#         # Step 3: Find the latest past day with predictions (excluding today)
+#         today = datetime.now().date()
+#         latest_day_predictions = []
+#         for days_back in range(1, 4):
+#             target_date = today - timedelta(days=days_back)
+#             latest_day_predictions = Prediction.query.filter(
+#                 db.func.date(Prediction.created_at) == target_date
+#             ).order_by(Prediction.id.desc()).all()
+
+#             if latest_day_predictions:
+#                 break
+
+#         # Step 4: Calculate streak from that day only
+#         streak = 0
+#         for p in latest_day_predictions:
+#             if p.winner_result == "won":
+#                 streak += 1
+#             else:
+#                 break  
+
+#         return jsonify({
+#             "success_rate": f"{success_rate}%",
+#             "won": streak,
+#             "total": total_entries,
+#             "streak": streak
+#         }), 200
+
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+
 @app.route("/api/success_rate_result", methods=["GET"])
 def success_rate_result():
     try:
@@ -750,8 +803,12 @@ def success_rate_result():
         if not success:
             return jsonify({"error": f"Update failed: {message}"}), 500
 
-        # Step 2: Calculate overall success rate from ALL predictions
-        all_predictions = Prediction.query.order_by(Prediction.id.desc()).all()
+        # Step 2: Calculate overall success rate from ALL predictions EXCLUDING today
+        today = datetime.now().date()
+        all_predictions = Prediction.query.filter(
+            db.func.date(Prediction.created_at) < today
+        ).order_by(Prediction.id.desc()).all()
+
         total_entries = len(all_predictions)
 
         if total_entries == 0:
@@ -765,8 +822,7 @@ def success_rate_result():
         total_won = sum(1 for p in all_predictions if p.winner_result == "won")
         success_rate = round((total_won / total_entries) * 100)
 
-        # Step 3: Find the latest past day with predictions (excluding today)
-        today = datetime.now().date()
+        # Step 3: Find the latest past day (excluding today) with predictions
         latest_day_predictions = []
         for days_back in range(1, 4):
             target_date = today - timedelta(days=days_back)
@@ -777,13 +833,13 @@ def success_rate_result():
             if latest_day_predictions:
                 break
 
-        # Step 4: Calculate streak from that day only
+        # Step 4: Calculate winning streak from latest past day
         streak = 0
         for p in latest_day_predictions:
             if p.winner_result == "won":
                 streak += 1
             else:
-                break  
+                break  # streak broken
 
         return jsonify({
             "success_rate": f"{success_rate}%",
@@ -794,7 +850,6 @@ def success_rate_result():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 
 
