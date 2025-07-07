@@ -83,23 +83,39 @@ def get_team_details_with_last_five_matches(team_id, league_cache):
 
     # 4. Get Last 5 Matches with League Name
     last_five_matches = []
+    league_ids = set()
     if team_name:
         encoded_name = urllib.parse.quote(team_name)
         search_url = f"/v3/football/fixtures/search/{encoded_name}?order=starting_at.desc&per_page=5"
         fixture_data = fetch_api(search_url, is_full_url=True)
+        fixtures = fixture_data.get("data", [])
+
+        for fixture in fixtures:
+            league_ids.add(fixture.get("league_id"))
+        
+        league_position_maps = {
+            league_id: get_team_positions_map(league_id)
+            for league_id in league_ids
+        }
+
         if fixture_data.get("data"):
             for fixture in fixture_data["data"]:
                 league_id = fixture.get("league_id")
                 league_name = get_league_name(league_id, league_cache)
+                position_map = league_position_maps.get(league_id, {})
+                team_position = position_map.get(team_id)
                 last_five_matches.append({
                     "fixture_id": fixture.get("id"),
                     "result_info": fixture.get("result_info"),
                     "season_id": fixture.get("season_id"),
                     "league_id": league_id,
                     "league_name": league_name,
-                    "leg": fixture.get("leg")
+                    "leg": fixture.get("leg"),
+                     "team_position": team_position
                 })
-
+    latest_position = None
+    if last_five_matches:
+        latest_position = last_five_matches[0].get("team_position")
     # 5. Final response
     return {
         "team_name": team_info.get("name"),
@@ -109,9 +125,31 @@ def get_team_details_with_last_five_matches(team_id, league_cache):
         "type": team_info.get("type"),
         "sport_id": team_info.get("sport_id"),
         **venue_info,
+        "team_position": latest_position,
         "last_five_matches": last_five_matches,
         "players": players
     }
+
+def get_team_positions_map(league_id):
+    """
+    Fetches live standings for a league and returns a dictionary:
+    {participant_id: position}
+    """
+    conn = http.client.HTTPSConnection("api.sportmonks.com")
+    endpoint = f"/v3/football/standings/live/leagues/{league_id}?api_token={API_TOKEN}"
+    conn.request("GET", endpoint)
+    res = conn.getresponse()
+    if res.status != 200:
+        print(f"Error: HTTP {res.status}")
+        return {}
+
+    data = res.read()
+    try:
+        standings_data = json.loads(data.decode("utf-8")).get("data", [])
+        return {entry["participant_id"]: entry["position"] for entry in standings_data}
+    except Exception as e:
+        print("Failed to process JSON:", e)
+        return {}
 
 
 def get_head_to_head(team_id_1, team_id_2):
@@ -154,6 +192,8 @@ def gpt_chatbot(team_id_A, team_id_B, match_date, notes, league_cache):
     league = team_A_data.get("league_name", "Unknown League")
     kickoff_time = match_date
     timezone = "UTC"  # You can update this if you have timezone info
+    team_A_position = team_A_data.get("team_position")
+    team_B_position = team_B_data.get("team_position")
 
     def format_matches(matches):
         return ", ".join([
@@ -163,7 +203,7 @@ def gpt_chatbot(team_id_A, team_id_B, match_date, notes, league_cache):
 
     team_a_form = format_matches(team_A_data['last_five_matches'])
     team_b_form = format_matches(team_B_data['last_five_matches'])
-
+    
     # Fetch head-to-head data for the last 3 meetings
     head_to_head_matches = get_head_to_head(team_id_A, team_id_B)
     if head_to_head_matches:
@@ -172,7 +212,7 @@ def gpt_chatbot(team_id_A, team_id_B, match_date, notes, league_cache):
         head_to_head = "N/A"
 
     injuries = "N/A"      # You can fetch and format if you have this data
-    standings = "N/A"     # You can fetch and format if you have this data
+    standings = f"Team A standing : {team_A_position} and Team B standing : {team_B_position}"     # You can fetch and format if you have this data
 
     # Print all stats for debugging
     print("\n===== MATCH STATS FOR GPT PREDICTION =====")

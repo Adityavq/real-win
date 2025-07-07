@@ -614,66 +614,6 @@ def match_details_page(fixture_id):
     return render_template('index.html')
 
 @app.route("/api/last_predictions", methods=["GET"])
-# def get_predictions_list():
-#     try:
-#         conn = db_connection()
-#         cur = conn.cursor()
-
-#         today = datetime.now().date()
-#         yesterday = today - timedelta(days=1)
-
-#         cur.execute("""
-#             SELECT id, match_id, confidence, predicted_winner_id, winner_result, data_points, created_at
-#             FROM predictions
-#             WHERE DATE(created_at) = %s
-#             ORDER BY confidence DESC
-#             LIMIT 5
-#         """, (yesterday,))
-#         rows = cur.fetchall()
-
-#         if not rows:
-#             cur.execute("""
-#                 SELECT id, match_id, confidence, predicted_winner_id, winner_result, data_points, created_at
-#                 FROM predictions
-#                 WHERE DATE(created_at) = %s
-#                 ORDER BY confidence DESC
-#                 LIMIT 5
-#             """, (today,))
-#             rows = cur.fetchall()
-
-#         cur.close()
-#         conn.close()
-
-#         predictions = []
-
-#         for row in rows:
-#             try:
-#                 dp = json.loads(row[5])
-#                 fixture = dp.get("fixture", "")
-#                 team1, team2 = fixture.split(" vs ")
-#                 predicted_winner = dp.get("predicted_winner", "")
-#                 kickoff_time = dp.get("kickoff_time", "")
-#                 kickoff_date = (
-#                     datetime.strptime(kickoff_time, "%Y-%m-%d %H:%M:%S %Z").strftime("%d %b %Y")
-#                     if kickoff_time else None
-#                 )
-#             except Exception as e:
-#                 # fallback if data is malformed
-#                 team1, team2, predicted_winner, kickoff_date = "?", "?", "?", "?"
-
-#             predictions.append({
-#                 "team1": team1,
-#                 "team2": team2,
-#                 "prediction": f"{predicted_winner.upper()} TO WIN",
-#                 "result": row[4].upper() if row[4] else "UNPLAYED",
-#                 "date": kickoff_date,
-#                 "raw_gpt_response": dp
-#             })
-
-#         return jsonify(predictions), 200
-
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
 def get_predictions_list():
     try:
         conn = db_connection()
@@ -799,31 +739,62 @@ def update_winner_results_internal():
 
     except Exception as e:
         db.session.rollback()
-        return False, str(e)
-
+        return False, str(e) 
 
 
 @app.route("/api/success_rate_result", methods=["GET"])
 def success_rate_result():
     try:
+        # Step 1: Update winner results
         success, message = update_winner_results_internal()
         if not success:
             return jsonify({"error": f"Update failed: {message}"}), 500
-        
-        last_10_predictions = Prediction.query.order_by(Prediction.id.desc()).all()
-        won_in_last_10 = sum(1 for p in last_10_predictions if p.winner_result == "won")
-        success_rate = (won_in_last_10 / 10) * 100 if last_10_predictions else 0
 
-        # Step 4: Get total "won" predictions so far (strike count)
-        total_won = Prediction.query.filter_by(winner_result="won").count()
+        # Step 2: Calculate overall success rate from ALL predictions
+        all_predictions = Prediction.query.order_by(Prediction.id.desc()).all()
+        total_entries = len(all_predictions)
+
+        if total_entries == 0:
+            return jsonify({
+                "success_rate": "0%",
+                "won": 0,
+                "total": 0,
+                "streak": 0
+            }), 200
+
+        total_won = sum(1 for p in all_predictions if p.winner_result == "won")
+        success_rate = round((total_won / total_entries) * 100)
+
+        # Step 3: Find the latest past day with predictions (excluding today)
+        today = datetime.now().date()
+        latest_day_predictions = []
+        for days_back in range(1, 4):
+            target_date = today - timedelta(days=days_back)
+            latest_day_predictions = Prediction.query.filter(
+                db.func.date(Prediction.created_at) == target_date
+            ).order_by(Prediction.id.desc()).all()
+
+            if latest_day_predictions:
+                break
+
+        # Step 4: Calculate streak from that day only
+        streak = 0
+        for p in latest_day_predictions:
+            if p.winner_result == "won":
+                streak += 1
+            else:
+                break  
+
         return jsonify({
-            "success_rate": f"{round(success_rate)}%",
-            "won": won_in_last_10,
-            "total": total_won
+            "success_rate": f"{success_rate}%",
+            "won": total_won,
+            "total": total_entries,
+            "streak": streak
         }), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 
