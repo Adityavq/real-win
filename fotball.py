@@ -190,7 +190,7 @@ def gpt_chatbot(team_id_A, team_id_B, match_date, notes, league_cache):
     print("========================================\n")
 
     final_prompt = f'''
-You are an expert AI sports analyst. Based on the structured data below, return a single JSON object with your strongest football betting prediction for the day. Use this format:
+You are an expert AI sports analyst. Based on the structured data provided below, return a single JSON object with your most confident football betting prediction for today’s matches. Be accurate and concise. Use the following format:
 
 {{
   "fixture": "<team_a> vs <team_b>",
@@ -201,7 +201,8 @@ You are an expert AI sports analyst. Based on the structured data below, return 
   "kickoff_time": "<YYYY-MM-DD HH:MM:SS UTC>"
 }}
 
-Only output the JSON object, with no extra text or markdown. Use snake_case for all keys. Do not include cricket or any placeholder data.
+Only output the JSON object, with no extra text or markdown. Use snake_case for all keys. Do no+6
+t include cricket or any placeholder data.
 
 Structured data:
 - Match: {match_title}
@@ -295,6 +296,7 @@ def fetch_all_matches_for_date(date_str):
             break
 
         data = response.json()
+
         matches = data.get("data", [])
         all_matches.extend(matches)
 
@@ -343,7 +345,9 @@ def get_top5_predictions_for_date(date_str, notes="Automated prediction for all 
         team_id_A = participant_data["team_a_id"]
         team_id_B = participant_data["team_b_id"]
         try:
-            match_date = datetime.strptime(starting_at, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y")
+            # match_date = datetime.strptime(starting_at, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y")
+            dt = datetime.strptime(starting_at, "%Y-%m-%d %H:%M:%S")
+            match_date = dt.strftime("%d-%m-%Y %H:%M")
         except Exception:
             match_date = starting_at
         # Get prediction

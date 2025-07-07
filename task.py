@@ -34,6 +34,7 @@ def run_and_store_all_today_predictions():
     global predictions_cache
     try:
         today = datetime.now().strftime('%Y-%m-%d')
+        print(today)
         matches = fetch_all_matches_for_date(today)
         predictions = []
         league_cache = {}
@@ -77,7 +78,9 @@ def run_and_store_all_today_predictions():
                 session.flush()
 
                 try:
-                    match_date = datetime.strptime(starting_at, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y")
+                    # match_date = datetime.strptime(starting_at, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y")
+                    dt = datetime.strptime(starting_at, "%Y-%m-%d %H:%M:%S")
+                    match_date = dt.strftime("%d-%m-%Y %H:%M")
                 except Exception:
                     match_date = starting_at
 
