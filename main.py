@@ -63,7 +63,7 @@ def select_sports_page():
     return render_template('select-sport.html')
 
 @app.route('/select-match')
-# @login_required
+@login_required
 def select_match_page():
     try:
         today = datetime.now().strftime('%Y-%m-%d')
