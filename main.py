@@ -787,7 +787,7 @@ def success_rate_result():
 
         return jsonify({
             "success_rate": f"{success_rate}%",
-            "won": total_won,
+            "won": streak,
             "total": total_entries,
             "streak": streak
         }), 200
