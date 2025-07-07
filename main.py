@@ -614,39 +614,98 @@ def match_details_page(fixture_id):
     return render_template('index.html')
 
 @app.route("/api/last_predictions", methods=["GET"])
+# def get_predictions_list():
+#     try:
+#         conn = db_connection()
+#         cur = conn.cursor()
+
+#         today = datetime.now().date()
+#         yesterday = today - timedelta(days=1)
+
+#         cur.execute("""
+#             SELECT id, match_id, confidence, predicted_winner_id, winner_result, data_points, created_at
+#             FROM predictions
+#             WHERE DATE(created_at) = %s
+#             ORDER BY confidence DESC
+#             LIMIT 5
+#         """, (yesterday,))
+#         rows = cur.fetchall()
+
+#         if not rows:
+#             cur.execute("""
+#                 SELECT id, match_id, confidence, predicted_winner_id, winner_result, data_points, created_at
+#                 FROM predictions
+#                 WHERE DATE(created_at) = %s
+#                 ORDER BY confidence DESC
+#                 LIMIT 5
+#             """, (today,))
+#             rows = cur.fetchall()
+
+#         cur.close()
+#         conn.close()
+
+#         predictions = []
+
+#         for row in rows:
+#             try:
+#                 dp = json.loads(row[5])
+#                 fixture = dp.get("fixture", "")
+#                 team1, team2 = fixture.split(" vs ")
+#                 predicted_winner = dp.get("predicted_winner", "")
+#                 kickoff_time = dp.get("kickoff_time", "")
+#                 kickoff_date = (
+#                     datetime.strptime(kickoff_time, "%Y-%m-%d %H:%M:%S %Z").strftime("%d %b %Y")
+#                     if kickoff_time else None
+#                 )
+#             except Exception as e:
+#                 # fallback if data is malformed
+#                 team1, team2, predicted_winner, kickoff_date = "?", "?", "?", "?"
+
+#             predictions.append({
+#                 "team1": team1,
+#                 "team2": team2,
+#                 "prediction": f"{predicted_winner.upper()} TO WIN",
+#                 "result": row[4].upper() if row[4] else "UNPLAYED",
+#                 "date": kickoff_date,
+#                 "raw_gpt_response": dp
+#             })
+
+#         return jsonify(predictions), 200
+
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
 def get_predictions_list():
     try:
         conn = db_connection()
         cur = conn.cursor()
 
-        today = datetime.now().date()
-        yesterday = today - timedelta(days=1)
+        predictions = []
+        combined_rows = []
+        max_days_back = 3
 
-        cur.execute("""
-            SELECT id, match_id, confidence, predicted_winner_id, winner_result, data_points, created_at
-            FROM predictions
-            WHERE DATE(created_at) = %s
-            ORDER BY confidence DESC
-            LIMIT 5
-        """, (yesterday,))
-        rows = cur.fetchall()
-
-        if not rows:
+        # Collect from yesterday, 2 and 3 days ago
+        for i in range(1, max_days_back + 1):
+            target_date = datetime.now().date() - timedelta(days=i)
             cur.execute("""
                 SELECT id, match_id, confidence, predicted_winner_id, winner_result, data_points, created_at
                 FROM predictions
                 WHERE DATE(created_at) = %s
-                ORDER BY confidence DESC
-                LIMIT 5
-            """, (today,))
-            rows = cur.fetchall()
+            """, (target_date,))
+            combined_rows.extend(cur.fetchall())
 
         cur.close()
         conn.close()
 
-        predictions = []
+        # Sort all combined rows by confidence DESC
+        sorted_rows = sorted(combined_rows, key=lambda x: x[2], reverse=True)  # x[2] = confidence
 
-        for row in rows:
+        # Take top 5 only
+        top_rows = sorted_rows[:5]
+
+        if not top_rows:
+            return jsonify([]), 200
+
+        for row in top_rows:
             try:
                 dp = json.loads(row[5])
                 fixture = dp.get("fixture", "")
@@ -657,8 +716,7 @@ def get_predictions_list():
                     datetime.strptime(kickoff_time, "%Y-%m-%d %H:%M:%S %Z").strftime("%d %b %Y")
                     if kickoff_time else None
                 )
-            except Exception as e:
-                # fallback if data is malformed
+            except Exception:
                 team1, team2, predicted_winner, kickoff_date = "?", "?", "?", "?"
 
             predictions.append({
@@ -678,34 +736,32 @@ def get_predictions_list():
 def update_winner_results_internal():
     try:
         today = datetime.now().date()
-        yesterday = today - timedelta(days=1)
+        max_days_back = 3
 
         conn = db_connection()
         cur = conn.cursor()
 
-        # Get top 5 predictions
-        cur.execute("""
-            SELECT match_id
-            FROM predictions
-            WHERE DATE(created_at) = %s
-            ORDER BY confidence DESC
-            LIMIT 5
-        """, (yesterday,))
-        rows = cur.fetchall()
+        rows = []
 
-        if not rows:
+        # ✅ Loop over yesterday, -2, -3 days (not today)
+        for i in range(1, max_days_back + 1):
+            target_date = today - timedelta(days=i)
             cur.execute("""
                 SELECT match_id
                 FROM predictions
                 WHERE DATE(created_at) = %s
-                ORDER BY confidence DESC
-                LIMIT 5
-            """, (today,))
+            """, (target_date,))
             rows = cur.fetchall()
+            if rows:
+                break  # Use first day with results
 
-        match_ids = [row[0] for row in rows]
         cur.close()
         conn.close()
+
+        if not rows:
+            return False, "No predictions found in the last 3 days."
+
+        match_ids = [row[0] for row in rows]
 
         for match_id in match_ids:
             url = f"https://api.sportmonks.com/v3/football/fixtures/{match_id}"
@@ -744,6 +800,7 @@ def update_winner_results_internal():
     except Exception as e:
         db.session.rollback()
         return False, str(e)
+
 
 
 @app.route("/api/success_rate_result", methods=["GET"])
