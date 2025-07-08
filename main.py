@@ -70,7 +70,6 @@ def select_match_page():
         top_preds = TopPrediction.query.filter_by(date=today).order_by(TopPrediction.id.desc()).all()
         result = []
         seen_fixtures = set()
-
         for top_pred in top_preds:
             pred = Prediction.query.get(top_pred.prediction_id)
             match = Match.query.get(pred.match_id)
@@ -620,26 +619,21 @@ def get_predictions_list():
         cur = conn.cursor()
 
         predictions = []
-        combined_rows = []
-        max_days_back = 3
 
-        # Collect from yesterday, 2 and 3 days ago
-        for i in range(1, max_days_back + 1):
-            target_date = datetime.now().date() - timedelta(days=i)
-            cur.execute("""
-                SELECT id, match_id, confidence, predicted_winner_id, winner_result, data_points, created_at
-                FROM predictions
-                WHERE DATE(created_at) = %s
-            """, (target_date,))
-            combined_rows.extend(cur.fetchall())
+        # Only fetch predictions from yesterday
+        target_date = datetime.now().date() - timedelta(days=1)
+        cur.execute("""
+            SELECT id, match_id, confidence, predicted_winner_id, winner_result, data_points, created_at
+            FROM predictions
+            WHERE DATE(created_at) = %s
+        """, (target_date,))
+        rows = cur.fetchall()
 
         cur.close()
         conn.close()
 
-        # Sort all combined rows by confidence DESC
-        sorted_rows = sorted(combined_rows, key=lambda x: x[2], reverse=True)  # x[2] = confidence
-
-        # Take top 5 only
+        # Sort by confidence descending
+        sorted_rows = sorted(rows, key=lambda x: x[2], reverse=True)
         top_rows = sorted_rows[:5]
 
         if not top_rows:
@@ -740,60 +734,6 @@ def update_winner_results_internal():
     except Exception as e:
         db.session.rollback()
         return False, str(e) 
-
-
-# @app.route("/api/success_rate_result", methods=["GET"])
-# def success_rate_result():
-#     try:
-#         # Step 1: Update winner results
-#         success, message = update_winner_results_internal()
-#         if not success:
-#             return jsonify({"error": f"Update failed: {message}"}), 500
-
-#         # Step 2: Calculate overall success rate from ALL predictions
-#         all_predictions = Prediction.query.order_by(Prediction.id.desc()).all()
-#         total_entries = len(all_predictions)
-
-#         if total_entries == 0:
-#             return jsonify({
-#                 "success_rate": "0%",
-#                 "won": 0,
-#                 "total": 0,
-#                 "streak": 0
-#             }), 200
-
-#         total_won = sum(1 for p in all_predictions if p.winner_result == "won")
-#         success_rate = round((total_won / total_entries) * 100)
-
-#         # Step 3: Find the latest past day with predictions (excluding today)
-#         today = datetime.now().date()
-#         latest_day_predictions = []
-#         for days_back in range(1, 4):
-#             target_date = today - timedelta(days=days_back)
-#             latest_day_predictions = Prediction.query.filter(
-#                 db.func.date(Prediction.created_at) == target_date
-#             ).order_by(Prediction.id.desc()).all()
-
-#             if latest_day_predictions:
-#                 break
-
-#         # Step 4: Calculate streak from that day only
-#         streak = 0
-#         for p in latest_day_predictions:
-#             if p.winner_result == "won":
-#                 streak += 1
-#             else:
-#                 break  
-
-#         return jsonify({
-#             "success_rate": f"{success_rate}%",
-#             "won": streak,
-#             "total": total_entries,
-#             "streak": streak
-#         }), 200
-
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/success_rate_result", methods=["GET"])
 def success_rate_result():

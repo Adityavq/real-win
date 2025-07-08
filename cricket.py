@@ -1,173 +1,181 @@
-import requests
-from datetime import datetime, timedelta
 import http.client
 import json
+import os
+from config import CRICKET_API_KEY, CRICKET_PROJECT_ID
+from datetime import datetime, timezone, timedelta
 
-API_TOKEN = 'EowWj4NnMhCihlx2acWj13J4AXSYpJJtPXjCcMM9BprYsttIl1PlcMHPAVcg'
-BASE_URL = 'https://cricket.sportmonks.com/api/v2.0/fixtures'
+def token_create_or_get():
+    conn = http.client.HTTPSConnection("api.sports.roanuz.com")
+    payload = json.dumps({
+        "api_key": CRICKET_API_KEY
+    })
+    headers = {
+        'Content-Type': 'application/json'
+    }
 
-# def get_matches():
-    # today = datetime.utcnow().date()
-    # tomorrow = today + timedelta(days=1)
-    # future = today + timedelta(days=7)
-
-    # headers = {
-    #     'Accept': 'application/json'
-    # }
-
-#     # Get today's matches
-#     today_url = f"{BASE_URL}?filter[starts_between]={today},{today}&api_token={API_TOKEN}&include=localteam,visitorteam"
-#     today_response = requests.get(today_url, headers=headers)
-#     today_matches = today_response.json().get('data', [])
-
-#     # Get upcoming matches (from tomorrow to 7 days later)
-#     upcoming_url = f"{BASE_URL}?filter[starts_between]={tomorrow},{future}&api_token={API_TOKEN}&include=localteam,visitorteam"
-#     upcoming_response = requests.get(upcoming_url, headers=headers)
-#     upcoming_matches = upcoming_response.json().get('data', [])
-
-#     return {
-#         'today_matches': today_matches,
-#         'upcoming_matches': upcoming_matches
-#     }
-
-# # Example usage:
-# if __name__ == "__main__":
-#     matches = get_matches()
-#     print("Today's Matches:", matches['today_matches'])
-#     print("Upcoming Matches:", matches['upcoming_matches'])
-
-# =============================================
-import http.client
-import json
-
-API_TOKEN = "EowWj4NnMhCihlx2acWj13J4AXSYpJJtPXjCcMM9BprYsttIl1PlcMHPAVcg"
-
-def fetch_json_from_api(endpoint):
-    conn = http.client.HTTPSConnection("cricket.sportmonks.com")
-    conn.request("GET", endpoint)
+    conn.request("POST", f"/v5/core/{CRICKET_PROJECT_ID}/auth/", payload, headers)
     res = conn.getresponse()
     data = res.read()
-    conn.close()
-
-    if res.status != 200:
-        print(f"❌ HTTP Error {res.status}")
-        return None
 
     try:
-        return json.loads(data.decode("utf-8"))
+        response_json = json.loads(data.decode("utf-8"))
+        if response_json.get("data") and "token" in response_json["data"]:
+            return response_json["data"]["token"]
+        else:
+            print("❌ Token fetch failed:", response_json.get("error", "Unknown error"))
+            return None
     except json.JSONDecodeError:
-        print("❌ Failed to parse JSON")
+        print("❌ Failed to decode token response.")
         return None
 
-def get_team_info(team_id):
-    endpoint = f"/api/v2.0/teams/{team_id}?api_token={API_TOKEN}"
-    response = fetch_json_from_api(endpoint)
-    if not response or "data" not in response:
-        return None
+def convert_unix_to_ist(timestamp):
+    dt_utc = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+    ist = dt_utc.astimezone(timezone(timedelta(hours=5, minutes=30)))
+    return ist
 
-    team = response["data"]
-    return {
-        "id": team.get("id"),
-        "name": team.get("name"),
-        "code": team.get("code"),
-        "image_path": team.get("image_path"),
-        "country_id": team.get("country_id"),
-        "national_team": team.get("national_team")
-    }
-
-def get_venue_info(venue_id):
-    endpoint = f"/api/v2.0/venues/{venue_id}?api_token={API_TOKEN}"
-    response = fetch_json_from_api(endpoint)
-    if not response or "data" not in response:
-        return None
-
-    venue = response["data"]
-    return {
-        "name": venue.get("name"),
-        "city": venue.get("city")
-    }
-
-def get_fixture_info(fixture_id):
-    endpoint = f"/api/v2.0/fixtures/{fixture_id}?api_token={API_TOKEN}"
-    response = fetch_json_from_api(endpoint)
-    if not response or "data" not in response:
-        return None
-
-    fixture = response["data"]
-    return {
-        "id": fixture.get("id"),
-        "league_id": fixture.get("league_id"),
-        "season_id": fixture.get("season_id"),
-        "stage_id": fixture.get("stage_id"),
-        "round": fixture.get("round"),
-        "localteam_id": fixture.get("localteam_id"),
-        "visitorteam_id": fixture.get("visitorteam_id"),
-        "starting_at": fixture.get("starting_at"),
-        "type": fixture.get("type"),
-        "venue_id": fixture.get("venue_id")
-    }
-
-def get_last_5_matches(local_id, visitor_id):
-    endpoint = f"/api/v2.0/fixtures?api_token={API_TOKEN}&include=localteam,visitorteam"
-    response = fetch_json_from_api(endpoint)
-    if not response or "data" not in response:
+def get_featured_matches(date_str):
+    token = token_create_or_get()
+    if not token:
+        print("Failed to retrieve token.")
         return []
 
-    all_fixtures = response["data"]
-    head_to_head = []
-    localteam_recent = []
+    conn = http.client.HTTPSConnection("api.sports.roanuz.com")
+    headers = {
+        'rs-token': token
+    }
 
-    for fixture in all_fixtures:
-        l_id = fixture.get("localteam_id")
-        v_id = fixture.get("visitorteam_id")
-        match = {
-            "match_id": fixture.get("id"),
-            "starting_at": fixture.get("starting_at"),
-            "note": fixture.get("note"),
-            "total_overs_played": fixture.get("total_overs_played")
-        }
+    conn.request("GET", f"/v5/cricket/{CRICKET_PROJECT_ID}/featured-matches-2/", '', headers)
+    res = conn.getresponse()
+    data = res.read()
+    response_json = json.loads(data.decode("utf-8"))
 
-        # Head-to-head match
-        if {l_id, v_id} == {local_id, visitor_id}:
-            head_to_head.append(match)
+    # Parse the target date
+    target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
 
-        # Local team played (either home or away)
-        if local_id in (l_id, v_id):
-            localteam_recent.append(match)
+    filtered_matches = []
+    for match in response_json.get("data", {}).get("matches", []):
+        if match.get("status") == "not_started" and match.get("start_at"):
+            start_ist = convert_unix_to_ist(match["start_at"])
+            match_date = start_ist.date()
 
-    # Sort both lists by date (most recent first)
-    head_to_head.sort(key=lambda x: x["starting_at"], reverse=True)
-    localteam_recent.sort(key=lambda x: x["starting_at"], reverse=True)
+            if match_date == target_date:
+                match["start_at_human"] = start_ist.strftime('%Y-%m-%d %H:%M:%S')
+                filtered_matches.append(match)
 
-    if head_to_head:
-        return head_to_head[:5]
-    else:
-        return localteam_recent[:5]
+    return filtered_matches
 
 
-# --- Main Logic ---
-fixture = get_fixture_info(66233)
-if fixture:
-    print("✅ Fixture Info:")
-    print(fixture)
+def get_last_five_matches(team_name):
+    token = token_create_or_get()
+    if not token:
+        print("❌ Failed to retrieve token.")
+        return []
 
-    local_team = get_team_info(fixture["localteam_id"])
-    visitor_team = get_team_info(fixture["visitorteam_id"])
-    venue = get_venue_info(fixture["venue_id"])
+    conn = http.client.HTTPSConnection("api.sports.roanuz.com")
+    headers = {
+        'rs-token': token
+    }
 
-    if local_team:
-        print("\n🏏 Team A (Local Team):")
-        print(local_team)
+    conn.request("GET", f"/v5/cricket/{CRICKET_PROJECT_ID}/featured-matches-2/", '', headers)
+    res = conn.getresponse()
+    data = res.read()
+    response_json = json.loads(data.decode("utf-8"))
 
-    if visitor_team:
-        print("\n🏏 Team B (Visitor Team):")
-        print(visitor_team)
+    all_matches = response_json.get("data", {}).get("matches", [])
 
-    if venue:
-        print("\n📍 Venue Info:")
-        print(venue)
+    relevant_matches = []
+    for match in all_matches:
+        if match.get("status") == "completed":
+            team_a = match.get("teams", {}).get("a", {}).get("name", "").lower()
+            team_b = match.get("teams", {}).get("b", {}).get("name", "").lower()
+            match_title = match.get("name", "").lower()
 
-    last_matches = get_last_5_matches(fixture["localteam_id"], fixture["visitorteam_id"])
-    print("\n📜 Last 5 Head-to-Head Matches:")
-    for match in last_matches:
-        print(match)
+            if team_name.lower() in team_a or team_name.lower() in team_b or team_name.lower() in match_title:
+                start_at = match.get("start_at")
+                winner_key = match.get("winner")  # 'a' or 'b'
+
+                if start_at:
+                    start_at_human = convert_unix_to_ist(start_at).strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    start_at_human = None
+
+                winner_name = None
+                if winner_key and winner_key in match.get("teams", {}):
+                    winner_name = match["teams"][winner_key]["name"]
+
+                relevant_matches.append({
+                    "name": match.get("name"),
+                    "status": "completed",
+                    "winner": winner_name,
+                    "start_at_human": start_at_human
+                })
+    last_five = sorted(relevant_matches, key=lambda m: m.get("start_at_human") or "", reverse=True)[:5]
+    return last_five
+
+
+
+
+def get_head_to_head_matches(team1, team2):
+    token = token_create_or_get()
+    if not token:
+        print("❌ Failed to retrieve token.")
+        return []
+
+    conn = http.client.HTTPSConnection("api.sports.roanuz.com")
+    headers = {
+        'rs-token': token
+    }
+
+    conn.request("GET", f"/v5/cricket/{CRICKET_PROJECT_ID}/featured-matches-2/", '', headers)
+    res = conn.getresponse()
+    data = res.read()
+    response_json = json.loads(data.decode("utf-8"))
+
+    all_matches = response_json.get("data", {}).get("matches", [])
+
+    team1 = team1.lower()
+    team2 = team2.lower()
+
+    h2h_matches = []
+    for match in all_matches:
+        if match.get("status") != "completed":
+            continue
+
+        match_name = match.get("name", "").lower()
+        # Check if both teams are in the match name
+        if team1 in match_name and team2 in match_name:
+            start_at = match.get("start_at")
+            winner_key = match.get("winner")
+
+            start_at_human = (
+                convert_unix_to_ist(start_at).strftime('%Y-%m-%d %H:%M:%S')
+                if start_at else None
+            )
+
+            winner_name = None
+            if winner_key and winner_key in match.get("teams", {}):
+                winner_name = match["teams"][winner_key]["name"]
+
+            h2h_matches.append({
+                "name": match.get("name"),
+                "status": "completed",
+                "winner": winner_name,
+                "start_at_human": start_at_human
+            })
+
+    # Optional: sort by start date descending
+    h2h_matches.sort(key=lambda m: m.get("start_at_human") or "", reverse=True)
+
+    return h2h_matches
+
+
+
+# matches = get_last_five_matches("Australia")
+# print(json.dumps(matches, indent=2))
+
+# matches = get_head_to_head_matches("West Indies", "Australia")
+# print(json.dumps(matches, indent=2))
+
+# # Example usage
+matches = get_featured_matches("2025-07-09")
+print(json.dumps(matches, indent=2))

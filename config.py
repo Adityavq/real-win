@@ -5,6 +5,9 @@ import os
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 API_TOKEN = os.getenv('API_TOKEN')
 
+CRICKET_API_KEY = os.getenv("CRICKET_API_KEY")
+CRICKET_PROJECT_ID = os.getenv("CRICKET_PROJECT_ID")
+
 # Database configuration: load from environment, fallback to local defaults
 DB_HOST = os.getenv('DB_HOST', 'localhost')
 DB_NAME = os.getenv('DB_NAME', 'realwin')

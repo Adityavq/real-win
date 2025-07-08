@@ -229,22 +229,26 @@ def gpt_chatbot(team_id_A, team_id_B, match_date, notes, league_cache):
     print(f"League Standings: {standings}")
     print("========================================\n")
 
-    final_prompt = f'''
-You are an expert AI sports analyst. Based on the structured data provided below, return a single JSON object with your most confident football betting prediction for today’s matches.
-Use all available datapoints to support your decision, including team form, standings, player information, venue, head-to-head stats, win probability, and any other relevant indicators.
-Be highly accurate and analytical. Provide a strong, detailed explanation grounded in the data, highlighting why this prediction is your best pick for today.
-Be accurate and concise use all datapoints that i am giving and give a good detailed explanation too. Use the following format:
-
-
+    final_prompt = f'''You are an expert AI sports analyst. Based on the structured data provided below, return a single JSON object with your most confident football betting prediction for today’s matches. Use all available datapoints—team form, standings, player info, venue, head-to-head stats, win probability, injuries, and any other relevant indicators—to arrive at your pick. Be highly analytical.
+ 
+Provide your explanation as an array of at least 4 detailed bullet points.
+ 
+Use the following JSON format (snake_case keys, no extra text or markdown):
+ 
 {{
   "fixture": "<team_a> vs <team_b>",
   "predicted_winner": "<team_name>",
-  "win_probability": <number>,  // percentage between 0-100
+  "win_probability": <number>,      // percentage 0-100
   "confidence_level": "<High|Medium|Low>",
-  "explanation": "<1-2 sentence explanation>",
+  "explanation": [
+    "<Bullet point #1>",
+    "<Bullet point #2>",
+    "<Bullet point #3>",
+    "<Bullet point #4>",
+    // (add more if needed)
+  ],
   "kickoff_time": "<YYYY-MM-DD HH:MM:SS UTC>"
 }}
-
 Only output the JSON object, with no extra text or markdown. Use snake_case for all keys. Do no+6
 t include cricket or any placeholder data.
 
