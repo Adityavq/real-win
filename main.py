@@ -620,8 +620,10 @@ def get_predictions_list():
 
         predictions = []
 
-        # Only fetch predictions from yesterday
+        # Get yesterday's date (based on server time)
         target_date = datetime.now().date() - timedelta(days=1)
+
+        # Fetch all predictions created yesterday
         cur.execute("""
             SELECT id, match_id, confidence, predicted_winner_id, winner_result, data_points, created_at
             FROM predictions
@@ -632,16 +634,28 @@ def get_predictions_list():
         cur.close()
         conn.close()
 
+        # Filter rows where the match kickoff is also yesterday
+        filtered_rows = []
+        for row in rows:
+            try:
+                dp = json.loads(row[5])
+                kickoff_str = dp.get("kickoff_time", "")
+                if kickoff_str:
+                    kickoff_dt = datetime.strptime(kickoff_str, "%Y-%m-%d %H:%M:%S %Z")
+                    if kickoff_dt.date() == target_date:
+                        filtered_rows.append((row, dp))
+            except Exception:
+                continue
+
         # Sort by confidence descending
-        sorted_rows = sorted(rows, key=lambda x: x[2], reverse=True)
+        sorted_rows = sorted(filtered_rows, key=lambda x: x[0][2], reverse=True)
         top_rows = sorted_rows[:5]
 
         if not top_rows:
             return jsonify([]), 200
 
-        for row in top_rows:
+        for row, dp in top_rows:
             try:
-                dp = json.loads(row[5])
                 fixture = dp.get("fixture", "")
                 team1, team2 = fixture.split(" vs ")
                 predicted_winner = dp.get("predicted_winner", "")
@@ -666,6 +680,7 @@ def get_predictions_list():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 def update_winner_results_internal():
     try:
